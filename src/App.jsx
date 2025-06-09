@@ -1,21 +1,20 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import CustomerTicketForm from "./pages/CustomerTicketForm";
+import Sidebar from './components/Sidebar'
 import IncidentDashboard from "./pages/Dashboard";
-import Header from "./components/Header"; //
 import NotFound from "./pages/NotFound"; // 
 
 function App() {
   return (
-    <Router>
-      <div className="max-w-6xl mx-auto px-4">
-        <Header /> 
+    <div className="flex">
+      <Sidebar />
+      <div className="flex-grow bg-[#1e1e2f] min-h-screen">
         <Routes>
-          <Route path="/" element={<CustomerTicketForm />} />
           <Route path="/dashboard" element={<IncidentDashboard />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="/tickets" element={<TicketForm />} />
         </Routes>
       </div>
-    </Router>
+    </div>
   );
 }
 
