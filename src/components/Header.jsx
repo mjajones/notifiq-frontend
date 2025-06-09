@@ -1,4 +1,3 @@
-// src/components/Header.jsx
 export default function Header() {
   return (
     <header className="mb-6 border-b pb-2">
