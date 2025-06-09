@@ -10,7 +10,7 @@ function App() {
       <div className="max-w-6xl mx-auto px-4">
         <Header /> 
         <Routes>
-          <Route path="/" element={<CustomerTicketForm />} />
+          <Route path="/submitticket" element={<CustomerTicketForm />} />
           <Route path="/dashboard" element={<IncidentDashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
