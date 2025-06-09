@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import CustomerTicketForm from "./pages/CustomerTicketForm";
-import IncidentDashboard from "./pages/IncidentDashboard";
+import IncidentDashboard from "./pages/Dashboard";
 import Header from "./components/Header"; //
 import NotFound from "./pages/NotFound"; // 
 
