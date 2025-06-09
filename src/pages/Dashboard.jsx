@@ -5,116 +5,154 @@ export default function IncidentDashboard() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sortColumn, setSortColumn] = useState('submitted_at');
-  const [sortDirection, setSortDirection] = useState('desc');
-
-  const fetchTickets = async () => {
-    try {
-      const response = await fetch('https://notifiq-backend-production.up.railway.app/api/incidents/');
-      if (!response.ok) throw new Error('Failed to fetch tickets');
-      const data = await response.json();
-      setTickets(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [sortKey, setSortKey] = useState('submitted_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        const response = await fetch('https://notifiq-backend-production.up.railway.app/api/incidents/');
+        if (!response.ok) throw new Error('Failed to fetch tickets');
+        const data = await response.json();
+        setTickets(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchTickets();
   }, []);
 
-  const handleSort = (column) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-
-  const sortedTickets = [...tickets].sort((a, b) => {
-    const valA = a[sortColumn];
-    const valB = b[sortColumn];
-    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const getStatusStyle = (status) => {
+  const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
-      case 'open': return 'text-yellow-600';
-      case 'in progress': return 'text-blue-500';
+      case 'open': return 'text-yellow-400';
+      case 'in progress': return 'text-blue-400';
       case 'resolved': return 'text-green-500';
-      case 'closed': return 'text-gray-500';
+      case 'closed': return 'text-gray-400';
       default: return 'text-white';
     }
   };
 
-  const getInitials = (ticket) => {
-    const name = ticket.email || ticket.title || '?';
-    return name.charAt(0).toUpperCase();
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortOrder('asc');
+    }
+  };
+
+  const sortedTickets = [...tickets].sort((a, b) => {
+    if (sortOrder === 'asc') return String(a[sortKey]).localeCompare(String(b[sortKey]));
+    return String(b[sortKey]).localeCompare(String(a[sortKey]));
+  });
+
+  const handleChange = (id, key, value) => {
+    setTickets((prev) =>
+      prev.map((ticket) => (ticket.id === id ? { ...ticket, [key]: value } : ticket))
+    );
+  };
+
+  const renderModal = () => {
+    if (!selectedTicket) return null;
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div className="bg-gray-900 text-white p-6 rounded-lg w-full max-w-md relative">
+          <button
+            onClick={() => setSelectedTicket(null)}
+            className="absolute top-2 right-4 text-xl font-bold text-gray-400 hover:text-white"
+          >
+            ×
+          </button>
+          <h2 className="text-xl font-bold mb-4">Ticket #{selectedTicket.id} Details</h2>
+          <p><span className="font-semibold">Title:</span> {selectedTicket.title}</p>
+          <p><span className="font-semibold">Email:</span> {selectedTicket.email || 'N/A'}</p>
+          <p><span className="font-semibold">Description:</span> {selectedTicket.description}</p>
+          <p><span className="font-semibold">Priority:</span> {selectedTicket.priority}</p>
+          <p><span className="font-semibold">Status:</span> {selectedTicket.status}</p>
+          <p><span className="font-semibold">Submitted:</span> {new Date(selectedTicket.submitted_at).toLocaleString()}</p>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto text-white bg-[#1e1e2f] min-h-screen">
       <Header />
-      <main className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-4xl font-bold mb-6 border-b border-zinc-700 pb-2">Incident Dashboard</h1>
+      <h1 className="text-4xl font-bold mb-6 border-b border-gray-600 pb-2">Incident Dashboard</h1>
 
-        {loading ? (
-          <p className="text-zinc-300">Loading tickets...</p>
-        ) : error ? (
-          <p className="text-red-400">Error: {error}</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-zinc-700">
-            <table className="min-w-full text-sm">
-              <thead className="bg-zinc-800 text-zinc-300 uppercase text-left text-xs">
-                <tr>
-                  {['ID', 'Title', 'Email', 'Priority', 'Status', 'Submitted At'].map((col, i) => (
-                    <th
-                      key={col}
-                      className="p-3 cursor-pointer"
-                      onClick={() => handleSort(col.toLowerCase().replace(/\s/g, '_'))}
-                    >
-                      {col}
-                      {sortColumn === col.toLowerCase().replace(/\s/g, '_') &&
-                        (sortDirection === 'asc' ? ' ↑' : ' ↓')}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTickets.map((ticket, idx) => (
-                  <tr
-                    key={ticket.id}
-                    className={`border-t border-zinc-700 ${
-                      idx % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800'
-                    } hover:bg-zinc-700 transition-colors`}
+      {loading ? (
+        <p>Loading tickets...</p>
+      ) : error ? (
+        <p className="text-red-400">Error: {error}</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-gray-700">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[#2b2b3d] text-gray-300 uppercase text-xs">
+              <tr>
+                {['id', 'title', 'email', 'priority', 'status', 'submitted_at'].map((col) => (
+                  <th
+                    key={col}
+                    onClick={() => handleSort(col)}
+                    className="text-left px-4 py-3 cursor-pointer select-none"
                   >
-                    <td className="p-3">{ticket.id}</td>
-                    <td className="p-3 flex items-center gap-2 font-medium">
-                      <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-xs text-white">
-                        {getInitials(ticket)}
-                      </div>
-                      {ticket.title}
-                    </td>
-                    <td className="p-3">{ticket.email || '-'}</td>
-                    <td className="p-3 capitalize">{ticket.priority}</td>
-                    <td className={`p-3 font-semibold ${getStatusStyle(ticket.status)}`}>
-                      {ticket.status}
-                    </td>
-                    <td className="p-3">
-                      {new Date(ticket.submitted_at).toLocaleString()}
-                    </td>
-                  </tr>
+                    {col.replace('_', ' ')}{' '}
+                    {sortKey === col ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </main>
+              </tr>
+            </thead>
+            <tbody className="bg-[#1e1e2f] divide-y divide-gray-700">
+              {sortedTickets.map((ticket) => (
+                <tr
+                  key={ticket.id}
+                  className="hover:bg-[#2e2e42] transition cursor-pointer"
+                  onClick={() => setSelectedTicket(ticket)}
+                >
+                  <td className="px-4 py-2 font-medium">{ticket.id}</td>
+                  <td className="px-4 py-2 flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-700 text-white font-semibold text-sm">
+                      {ticket.title?.charAt(0).toUpperCase() || '?'}
+                    </span>
+                    {ticket.title}
+                  </td>
+                  <td className="px-4 py-2">{ticket.email || '-'}</td>
+                  <td className="px-4 py-2 capitalize">
+                    <select
+                      value={ticket.priority}
+                      onChange={(e) => handleChange(ticket.id, 'priority', e.target.value)}
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </td>
+                  <td className={`px-4 py-2 font-semibold ${getStatusColor(ticket.status)}`}>
+                    <select
+                      value={ticket.status}
+                      onChange={(e) => handleChange(ticket.id, 'status', e.target.value)}
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="open">Open</option>
+                      <option value="in progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    {new Date(ticket.submitted_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {renderModal()}
     </div>
   );
 }
