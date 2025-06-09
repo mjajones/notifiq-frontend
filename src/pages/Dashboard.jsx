@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Header from '../components/Header';
 
 export default function IncidentDashboard() {
   const [tickets, setTickets] = useState([]);
@@ -10,7 +9,7 @@ export default function IncidentDashboard() {
 
   const fetchTickets = async () => {
     try {
-      const response = await fetch('/api/incidents/');
+      const response = await fetch('https://notifiq-backend-production.up.railway.app/api/incidents/');
       if (!response.ok) throw new Error('Failed to fetch tickets');
       const data = await response.json();
       setTickets(data);
