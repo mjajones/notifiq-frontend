@@ -4,24 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Base colors for backgrounds
-        'base-300': '#111827', // Darkest background (e.g., sidebar)
-        'base-200': '#1F2937', // Main content background
-        'base-100': '#374151', // Lighter background for elements like table headers, card footers
+        // Page colors
+        'background': '#F0F2F5', // Light gray background for the page
+        'foreground': '#FFFFFF', // White background for cards
 
-        // Content colors for text and icons
-        'content-primary': '#F9FAFB', // Main text color
-        'content-secondary': '#9CA3AF', // Lighter text for subtitles, placeholders
-        'content-accent': '#6366F1',    // Accent color for highlights
+        // Sidebar colors
+        'sidebar': '#111827',     // Dark background for the sidebar
+        'sidebar-hover': '#1F2937', // Hover color for sidebar links
 
-        // Action colors
-        'accent': '#6366F1', // Indigo, for primary buttons and active states
-        'accent-hover': '#4F46E5',
+        // Brand/Accent color
+        'primary': '#2C64E4',
+        'primary-hover': '#1A4DBE',
 
-        // Semantic colors for status, alerts, etc.
-        'success': '#10B981',
-        'warning': '#F59E0B',
-        'error': '#EF4444',
+        // Text colors
+        'text-primary': '#18181B',
+        'text-secondary': '#6B7280',
+        'text-on-sidebar': '#E5E7EB', // Text color for use on the dark sidebar
+
+        // Border color
+        'border': '#E5E7EB',
       },
     },
   },
