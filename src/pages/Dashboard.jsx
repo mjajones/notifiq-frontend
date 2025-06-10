@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 
-// Use VITE_API_URL or fallback to localhost
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) {
+    throw new Error('Vite_API_URL not set');
+}
 
 export default function IncidentDashboard() {
   const [tickets, setTickets] = useState([]);
