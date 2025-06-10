@@ -34,7 +34,7 @@ export default function TicketForm() {
     const handleSubmit = (e) => {
     e.preventDefault();
     console.log(formData);
-    // Handle submit logic here
+
   };
 
     return (
