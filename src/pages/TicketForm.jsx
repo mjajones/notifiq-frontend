@@ -4,9 +4,8 @@ import Header from '../components/Header';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Reusable input/select classes
-const inputClass =
-  'w-full bg-gray-800 text-white p-2 rounded border border-gray-700 focus:outline-none focus:border-blue-500';
-const labelClass = 'block mb-1 font-medium text-gray-200';
+const inputClass = 'w-full bg-base-100 text-content-primary p-2 rounded-md border border-base-300 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-shadow';
+const labelClass = 'block mb-1.5 text-sm font-medium text-content-secondary';
 
 export default function TicketForm() {
   // Form fields
@@ -330,7 +329,7 @@ export default function TicketForm() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+            className="w-full bg-accent text-white font-semibold py-2.5 px-4 rounded-md hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-base-300 focus:ring-accent transition-colors"
           >
             Submit Ticket
           </button>

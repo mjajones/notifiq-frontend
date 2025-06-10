@@ -4,7 +4,6 @@
 
 body {
   margin: 0;
-  background-color: #534b4b; /* dark bg if desired */
-  color: #e5e7eb;            /* light text */
-  font-family: system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

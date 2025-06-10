@@ -105,42 +105,36 @@ export default function Dashboard() {
           <>
             {/* Top summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-              <StatsCard
-                label="Overdue Tickets"
-                count={overdueCount}
-                bgColor="bg-gray-800"
-                textColor="text-red-400"
-              />
-              <StatsCard
-                label="Tickets Due Today"
-                count={dueTodayCount}
-                bgColor="bg-gray-800"
-                textColor="text-yellow-300"
-              />
-              <StatsCard
-                label="Open Tickets"
-                count={openCount}
-                bgColor="bg-gray-800"
-                textColor="text-yellow-300"
-              />
-              <StatsCard
-                label="Tickets On Hold"
-                count={onHoldCount}
-                bgColor="bg-gray-800"
-                textColor="text-orange-300"
-              />
-              <StatsCard
-                label="Unassigned Tickets"
-                count={unassignedCount}
-                bgColor="bg-gray-800"
-                textColor="text-indigo-300"
-              />
-              <StatsCard
-                label="Tickets I'm Watching"
-                count={watchingCount}
-                bgColor="bg-gray-800"
-                textColor="text-blue-300"
-              />
+                <StatsCard
+                    label="Overdue Tickets"
+                    count={overdueCount}
+                    // Use the 'error' color from your theme if count > 0
+                    className={overdueCount > 0 ? 'text-error' : ''}
+                />
+                <StatsCard
+                    label="Tickets Due Today"
+                    count={dueTodayCount}
+                    // Use the 'warning' color from your theme if count > 0
+                    className={dueTodayCount > 0 ? 'text-warning' : ''}
+                />
+                <StatsCard
+                    label="Open Tickets"
+                    count={openCount}
+                />
+                <StatsCard
+                    label="Tickets On Hold"
+                    count={onHoldCount}
+                />
+                <StatsCard
+                    label="Unassigned Tickets"
+                    count={unassignedCount}
+                    // Use the 'accent' color from your theme
+                    className="text-accent"
+                />
+                <StatsCard
+                    label="Tickets I'm Watching"
+                    count={watchingCount}
+                />
             </div>
 
             {/* Chart area */}

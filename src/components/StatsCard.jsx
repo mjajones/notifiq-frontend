@@ -1,10 +1,10 @@
 import React from 'react';
 
-export default function StatsCard({ label, count, bgColor = 'bg-white', textColor = 'text-black' }) {
+export default function StatsCard({ label, count, className = '' }) {
   return (
-    <div className={`flex-1 min-w-[150px] p-4 rounded-lg shadow ${bgColor}`}>
-      <div className="text-sm font-medium">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold ${textColor}`}>{count}</div>
+    <div className={`bg-base-200 p-4 rounded-lg shadow-md ${className}`}>
+      <div className="text-sm font-medium text-content-secondary">{label}</div>
+      <div className="mt-1 text-3xl font-semibold text-content-primary">{count}</div>
     </div>
   );
 }
