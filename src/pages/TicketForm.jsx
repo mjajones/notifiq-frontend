@@ -27,12 +27,17 @@ export default function TicketForm() {
 
   const [message, setMessage] = useState(null);
   // Options definitions
-  const sourceOptions = ['phone', 'email', 'portal'];
+  const sourceOptions = ['Portal', 'phone', 'email', 'MS Teams', 'Slack', 'Employee Onboarding', 'Employee Offboarding'];
   const statusOptions = ['Open', 'In Progress', 'On Hold', 'Resolved', 'Closed'];
   const urgencyOptions = ['Low', 'Medium', 'High'];
   const impactOptions = ['Low', 'Medium', 'High'];
-  const priorityOptions = ['Low', 'Medium', 'High'];
-  const groupOptions = ['Level 1 Helpdesk', 'Level 2 Helpdesk', 'Level 3 Helpdesk'];
+  const priorityOptions = [
+  { value: 'Low', label: 'Low', color: 'bg-green-500' },
+  { value: 'Medium', label: 'Medium', color: 'bg-blue-500' },
+  { value: 'High', label: 'High', color: 'bg-orange-500' },
+  { value: 'Urgent', label: 'Urgent', color: 'bg-red-500' },
+  ];
+  const groupOptions = ['Level 1 Helpdesk', 'Level 2 Helpdesk', 'Level 3 Helpdesk', 'Change Team', 'Database Team', 'Helpdesk Monitoring Team', 'Incident Team', 'Service Design Team', 'Software Team'];
   const departmentOptions = ['IT', 'HR', 'Sales', 'Operations', 'Marketing'];
   const categoryOptions = ['Hardware', 'Software', 'Network', 'Office Applications'];
   // Subcategory mapping
@@ -142,7 +147,8 @@ export default function TicketForm() {
               value={formData.requester}
               onChange={handleChange}
               className={inputClass}
-              placeholder="Your name or user ID"
+              placeholder="Search for an employee by name..."
+              list="agents-list"
               required
             />
           </div>
@@ -223,17 +229,17 @@ export default function TicketForm() {
           {/* Priority */}
           <div>
             <label htmlFor="priority" className={labelClass}>Priority</label>
-            <select
-              id="priority"
-              name="priority"
-              value={formData.priority}
-              onChange={handleChange}
-              className={inputClass}
-            >
+            <select id="priority" name="priority" /* ... */>
               {priorityOptions.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
+            <div className="flex items-center mt-2">
+              <span className={`w-4 h-4 rounded-sm mr-2 ${priorityOptions.find(p => p.value === formData.priority)?.color}`}></span>
+              <span className="text-xs text-text-secondary">{formData.priority}</span>
+            </div>
           </div>
           {/* Group */}
           <div>
@@ -260,7 +266,8 @@ export default function TicketForm() {
               value={formData.agent}
               onChange={handleChange}
               className={inputClass}
-              placeholder="Agent name (if assigning now)"
+              placeholder="Search or select an agent..."
+              list = "agents-list"
             />
           </div>
           {/* Department */}
@@ -326,6 +333,55 @@ export default function TicketForm() {
               required
             />
           </div>
+          {/* Tags */}
+          <div>
+            <label htmlFor="tags" className={labelClass}>Tags</label>
+            <div className="flex flex-wrap items-center gap-2 p-2 ...">
+              {formData.tags.map(tag => (
+                <span key={tag} className="flex items-center ...">
+                  {tag}
+                  <button type="button" onClick={() => removeTag(tag)} /* ... */>
+                    <FiX size={14} />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="tags"
+                type="text"
+                onKeyDown={handleTagKeyDown}
+                placeholder="Add tags..."
+              />
+            </div>
+          </div>
+          {/* File Upload */}
+          // JSX for the drop zone
+          <div 
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`relative border-2 border-dashed ... ${isDragging ? 'border-primary' : 'border-border'}`}
+          >
+            <p>Drop files here, or</p>
+            <button type="button" onClick={() => fileInputRef.current.click()} /*...*/ >
+              browse to attach files
+            </button>
+            <p className="text-xs ...">(File size &lt; 50 MB)</p>
+            <input type="file" ref={fileInputRef} className="hidden" multiple />
+          </div>
+
+          {files.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4>Attached files:</h4>
+              {files.map((file, index) => (
+                <div key={index} className="flex items-center justify-between ...">
+                  <span>{file.name}</span>
+                  <button onClick={() => removeFile(file)} /*...*/ >
+                    <FiX />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"
@@ -345,6 +401,10 @@ export default function TicketForm() {
               {message.text}
             </p>
           )}
+          {/* For IT support agent and employee list - tied to backend */ }
+          <datalist id="agents-list">
+            {agents.map(agent => <option key={agent.id} value={agent.name} />)}
+          </datalist>
         </form>
       </div>
     </div>
