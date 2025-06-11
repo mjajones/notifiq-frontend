@@ -1,3 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-background: #F0F2F5;
+  --color-foreground: #FFFFFF;
+  --color-sidebar: #111827;
+  --color-sidebar-hover: #1F2937;
+  --color-primary: #2C64E4;
+  --color-primary-hover: #1A4DBE;
+  --color-text-primary: #18181B;
+  --color-text-secondary: #6B7280;
+  --color-text-on-sidebar: #E5E7EB;
+  --color-border: #E5E7EB;
+}
