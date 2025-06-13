@@ -1,25 +1,43 @@
-import React, { useEffect, useState } from 'react';
-import StatsCard from '../components/StatsCard';
-import ChartCard from '../components/ChartCard';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
+import React, { useEffect, useState, useContext } from 'react';
+import StatsCard from '../components/StatsCard.jsx';
+import ChartCard from '../components/ChartCard.jsx';
+import AuthContext from '../context/AuthContext.jsx';
 import dayjs from 'dayjs';
 
 export default function Dashboard() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { authTokens } = useContext(AuthContext);
 
-  // Fetch
-  const API_URL = import.meta.env.VITE_API_URL || 'https://notifiq-backend-production.up.railway.app';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     const fetchTickets = async () => {
+      if (!authTokens) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const resp = await fetch(`${API_URL}/api/incidents/`);
+        const resp = await fetch(`${API_URL}/api/incidents/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authTokens.access}` 
+          }
+        });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        setTickets(data);
+        
+        // For my responses
+        if (data && Array.isArray(data.results)) {
+            setTickets(data.results);
+        } else if (Array.isArray(data)) {
+            setTickets(data);
+        } else {
+            setTickets([]);
+        }
       } catch (err) {
         console.error('Error fetching tickets:', err);
         setError(err.message);
@@ -28,129 +46,52 @@ export default function Dashboard() {
       }
     };
     fetchTickets();
-  }, [API_URL]);
+  }, [authTokens]);
 
-  // Helpers to parse/compute:
+  // data calcs and jsks
   const now = dayjs();
-
-
-  const overdueCount = tickets.filter((t) => {
-    if (!t.due_date) return false;
-    return dayjs(t.due_date).isBefore(now, 'day') && t.status !== 'resolved' && t.status !== 'closed';
-  }).length;
-
-  const dueTodayCount = tickets.filter((t) => {
-    if (!t.due_date) return false;
-    return dayjs(t.due_date).isSame(now, 'day');
-  }).length;
-
-  const openCount = tickets.filter((t) => t.status === 'open').length;
-  const onHoldCount = tickets.filter((t) => t.status === 'on hold').length; // adjust if your statuses differ
+  const overdueCount = tickets.filter((t) => t.due_date && dayjs(t.due_date).isBefore(now, 'day') && t.status !== 'resolved' && t.status !== 'closed').length;
+  const dueTodayCount = tickets.filter((t) => t.due_date && dayjs(t.due_date).isSame(now, 'day')).length;
+  const openCount = tickets.filter((t) => t.status && t.status.toLowerCase() === 'open').length;
+  const onHoldCount = tickets.filter((t) => t.status && t.status.toLowerCase() === 'on hold').length;
   const unassignedCount = tickets.filter((t) => !t.agent).length;
-  // For "Tickets I'm Watching" used t.watching
-  const currentUser = 'mjj0'; 
-  const watchingCount = tickets.filter((t) => {
-    if (!Array.isArray(t.watching_by)) return false;
-    return t.watching_by.includes(currentUser);
-  }).length;
-
-  // Chart data: Unresolved by Priority
-  const priorityBuckets = ['high', 'medium', 'low'];
-  const priorityCounts = priorityBuckets.map((p) =>
-    tickets.filter((t) => t.priority === p && t.status !== 'resolved' && t.status !== 'closed').length
-  );
-  // Chart data: Unresolved by Status
+  const watchingCount = 0; // watching logic
+  const priorityBuckets = ['High', 'Medium', 'Low', 'Urgent'];
+  const priorityCounts = priorityBuckets.map((p) => tickets.filter((t) => t.priority === p && t.status !== 'resolved' && t.status !== 'closed').length);
   const statusBuckets = Array.from(new Set(tickets.map((t) => t.status)));
-  const statusCounts = statusBuckets.map((s) =>
-    tickets.filter((t) => t.status === s && t.status !== 'resolved' && t.status !== 'closed').length
-  );
-  // Chart data: New & My Open Tickets
+  const statusCounts = statusBuckets.map((s) => tickets.filter((t) => t.status === s && t.status !== 'resolved' && t.status !== 'closed').length);
   const sevenDaysAgo = now.subtract(7, 'day');
-  const newOpenCount = tickets.filter((t) => {
-    if (!t.submitted_at) return false;
-    return dayjs(t.submitted_at).isAfter(sevenDaysAgo) && t.status === 'open';
-  }).length;
-  const myOpenCount = tickets.filter((t) => t.agent === currentUser && t.status === 'open').length;
+  const newOpenCount = tickets.filter((t) => dayjs(t.submitted_at).isAfter(sevenDaysAgo) && t.status === 'open').length;
+  const myOpenCount = 0; // agent specific logic
+  const priorityColors = ['#EF4444', '#F59E0B', '#10B981', '#B91C1C'];
+  const statusColors = statusBuckets.map(() => `#${Math.floor(Math.random()*16777215).toString(16)}`);
 
-  // Colors for prior chart: high=red, medium=yellow, low=green
-  const priorityColors = ['#dc2626', '#f59e0b', '#10b981'];
-  // Status chart colors
-  const statusColors = statusBuckets.map((s, idx) => {
-    const key = s.toLowerCase();
-    if (key === 'open') return '#fbbf24';
-    if (key === 'in progress') return '#3b82f6';
-    if (key === 'on hold') return '#f97316';
-    if (key === 'pending') return '#6366f1';
-    // fallback gray
-    return '#9ca3af';
-  });
 
   return (
     <>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-red-500 text-white">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-text-primary">Dashboard</h1>
       </div>
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-text-secondary">Loading dashboard data...</p>
       ) : error ? (
-        <p className="text-red-400">Error: {error}</p>
+        <p className="text-red-500">Error loading data: {error}</p>
       ) : (
         <>
-          {/* Top summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <StatsCard
-              label="Overdue Tickets"
-              count={overdueCount}
-            />
-            <StatsCard
-              label="Tickets Due Today"
-              count={dueTodayCount}
-            />
-            <StatsCard
-              label="Open Tickets"
-              count={openCount}
-            />
-            <StatsCard
-              label="Tickets On Hold"
-              count={onHoldCount}
-            />
-            <StatsCard
-              label="Unassigned Tickets"
-              count={unassignedCount}
-            />
-            <StatsCard
-              label="Tickets I'm Watching"
-              count={watchingCount}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+            <StatsCard label="Overdue Tickets" count={overdueCount} />
+            <StatsCard label="Tickets Due Today" count={dueTodayCount} />
+            <StatsCard label="Open Tickets" count={openCount} />
+            <StatsCard label="Tickets On Hold" count={onHoldCount} />
+            <StatsCard label="Unassigned Tickets" count={unassignedCount} />
+            <StatsCard label="Tickets I'm Watching" count={watchingCount} />
           </div>
 
-          {/* Chart area */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <ChartCard
-              title="Unresolved Tickets by Priority"
-              type="doughnut"
-              labels={priorityBuckets.map((p) => p.charAt(0).toUpperCase() + p.slice(1))}
-              data={priorityCounts}
-              colors={priorityColors}
-            />
-            <ChartCard
-              title="Unresolved Tickets by Status"
-              type="doughnut"
-              labels={statusBuckets.map((s) => s.charAt(0).toUpperCase() + s.slice(1))}
-              data={statusCounts}
-              colors={statusColors}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <ChartCard
-              title="New & My Open Tickets"
-              type="bar"
-              labels={['New (7d)', 'My Open']}
-              data={[newOpenCount, myOpenCount]}
-              colors={['#3b82f6', '#10b981']}
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartCard title="Unresolved Tickets by Priority" type="doughnut" labels={priorityBuckets} data={priorityCounts} colors={priorityColors} />
+            <ChartCard title="Unresolved Tickets by Status" type="doughnut" labels={statusBuckets} data={statusCounts} colors={statusColors} />
+            <ChartCard title="New & My Open Tickets" type="bar" labels={['New (7d)', 'My Open']} data={[newOpenCount, myOpenCount]} colors={['#3b82f6', '#10b981']} />
           </div>
         </>
       )}

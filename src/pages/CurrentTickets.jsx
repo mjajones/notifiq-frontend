@@ -42,11 +42,23 @@ export default function CurrentTickets() {
             }
             try {
                 const response = await fetch(`${API_URL}/api/incidents/`, {
-                    headers: { 'Authorization': `Bearer ${authTokens.access}` }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // 4. Add the Authorization header
+                        'Authorization': `Bearer ${authTokens.access}`
+                    }
                 });
-                if (!response.ok) throw new Error('Failed to fetch tickets');
+                if (!response.ok) throw new Error(`HTTP ${response.status} Unauthorized`);
                 const data = await response.json();
-                setTickets(Array.isArray(data) ? data : (data.results || []));
+                
+                // Handle paginated responses from Django Rest Framework
+                if (data && Array.isArray(data.results)) {
+                    setTickets(data.results);
+                } else if (Array.isArray(data)) {
+                    setTickets(data);
+                } else {
+                    setTickets([]);
+                }
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -54,7 +66,7 @@ export default function CurrentTickets() {
             }
         };
         fetchTickets();
-    }, [authTokens, API_URL]);
+    }, [authTokens]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         const originalTickets = [...tickets];
