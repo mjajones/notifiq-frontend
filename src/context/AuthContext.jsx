@@ -1,5 +1,7 @@
+// src/context/AuthContext.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode'; // <-- Import the decoder
 
 const AuthContext = createContext();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -25,11 +27,11 @@ export const AuthProvider = ({ children }) => {
 
         if(response.status === 200){
             setAuthTokens(data);
-            setUser(jwtDecode(data.access));
+            // Decode the token to get user details (username, groups, etc.)
+            setUser(jwtDecode(data.access)); 
             localStorage.setItem('authTokens', JSON.stringify(data));
             return true;
         } else {
-            // alert
             return false;
         }
     };
@@ -48,10 +50,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        if(loading){
-            setLoading(false);
+        // This effect ensures the user state is updated if the token changes
+        if (authTokens) {
+            setUser(jwtDecode(authTokens.access));
         }
-    }, [authTokens, loading]);
+        setLoading(false);
+    }, [authTokens]);
 
     return(
         <AuthContext.Provider value={contextData} >
