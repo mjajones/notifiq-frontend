@@ -4,17 +4,15 @@ import { FaHome, FaTicketAlt, FaPlus, FaBox, FaSignOutAlt } from 'react-icons/fa
 import AuthContext from '../context/AuthContext.jsx';
 
 export default function Sidebar() {
-  const { user, logoutUser } = useContext(AuthContext); // Get the full user object
+  const { user, logoutUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  console.log('User object from context:', user);
   const handleLogout = () => {
     logoutUser();
-    navigate('/login');
   };
 
-  // Check if IT
-  const isITStaff = user && user.groups && user.groups.includes('IT Staff');
+  // Check if user is IT staff
+  const isITStaff = user?.groups?.includes('IT Staff');
 
   const baseLinkClass = 'flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors text-text-on-sidebar/70 hover:bg-sidebar-hover hover:text-text-on-sidebar';
   const activeLinkClass = 'bg-primary text-white';
@@ -25,7 +23,8 @@ export default function Sidebar() {
         NotifiQ
       </div>
       <nav className="flex-1 px-4 py-4 space-y-1">
-        {/* For IT */}
+        
+        {/* Links - IT staff */}
         {isITStaff && (
           <>
             <NavLink to="/dashboard" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
@@ -37,7 +36,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {/* For everyone */}
+        {/* Links - logged in users */}
         <NavLink to="/tickets" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
           <FaTicketAlt className="mr-3" /> My Tickets
         </NavLink>
@@ -46,6 +45,7 @@ export default function Sidebar() {
         </NavLink>
       </nav>
 
+      {/* User info / logout button */}
       <div className="px-4 py-4 mt-auto border-t border-sidebar-hover">
         <div className="text-xs text-text-on-sidebar/50 mb-2 px-4">Logged in as: {user?.username}</div>
         <button onClick={handleLogout} className={`${baseLinkClass} w-full`}>
