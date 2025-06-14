@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import AuthContext from '../context/AuthContext.jsx'; //
 
 const inputClass = "w-full bg-foreground p-2 rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow text-text-primary placeholder:text-text-secondary/50";
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
@@ -6,20 +7,14 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function AssetForm() {
     const [formData, setFormData] = useState({
-        assetName: '',
-        assetTag: '',
-        assetType: '',
-        impact: 'Low',
-        description: '',
-        endOfLife: '',
-        location: 'US',
-        department: 'IT',
-        managedByGroup: 'Helpdesk Monitoring Team',
+        assetName: '', assetTag: '', assetType: '', impact: 'Low',
+        description: '', endOfLife: '', location: 'US',
+        department: 'IT', managedByGroup: 'Helpdesk Monitoring Team',
         managedBy: ''
     });
-
     const [itStaff, setItStaff] = useState([]);
     const [message, setMessage] = useState('');
+    const { authTokens } = useContext(AuthContext);
 
     // All options
     const assetTypeOptions = [
@@ -36,23 +31,23 @@ export default function AssetForm() {
     // Fetch IT staff
     useEffect(() => {
         const fetchItStaff = async () => {
+            if (!authTokens) return;
             try {
-                // /api/users for all staff
-                const response = await fetch(`${API_URL}/api/users/`);
-                if (!response.ok) throw new Error('Failed to fetch users');
+                const response = await fetch(`${API_URL}/api/users/`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authTokens.access}`
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to fetch IT staff');
                 const data = await response.json();
-                
-                if (data && Array.isArray(data.results)) {
-                    setItStaff(data.results);
-                } else if (Array.isArray(data)) {
-                    setItStaff(data);
-                }
+                setItStaff(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
             } catch (error) {
                 console.error("Error fetching IT staff:", error);
             }
         };
         fetchItStaff();
-    }, []); // 
+    }, [authTokens]);
 
 
     const handleChange = (e) => {
