@@ -7,6 +7,7 @@ export default function Sidebar() {
   const { user, logoutUser } = useContext(AuthContext); // Get the full user object
   const navigate = useNavigate();
 
+  console.log('User object from context:', user);
   const handleLogout = () => {
     logoutUser();
     navigate('/login');
