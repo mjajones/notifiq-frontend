@@ -1,7 +1,6 @@
-// src/context/AuthContext.jsx
-
 import React, { createContext, useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode'; // <-- Import the decoder
+import { jwtDecode } from 'jwt-decode';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -15,21 +14,21 @@ export const AuthProvider = ({ children }) => {
     );
     const [loading, setLoading] = useState(true);
 
+    const navigate = useNavigate();
+
     const loginUser = async (username, password) => {
         const response = await fetch(`${API_URL}/api/token/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
         const data = await response.json();
 
         if(response.status === 200){
             setAuthTokens(data);
-            // Decode the token to get user details (username, groups, etc.)
-            setUser(jwtDecode(data.access)); 
+            setUser(jwtDecode(data.access));
             localStorage.setItem('authTokens', JSON.stringify(data));
+            navigate('/dashboard');
             return true;
         } else {
             return false;
@@ -40,22 +39,63 @@ export const AuthProvider = ({ children }) => {
         setAuthTokens(null);
         setUser(null);
         localStorage.removeItem('authTokens');
+        navigate('/login');
+    };
+
+    const updateToken = async () => {
+        if (!authTokens?.refresh) {
+            logoutUser();
+            return;
+        }
+
+        const response = await fetch(`${API_URL}/api/token/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 'refresh': authTokens.refresh })
+        });
+
+        const data = await response.json();
+        
+        if (response.status === 200) {
+            setAuthTokens(data);
+            setUser(jwtDecode(data.access));
+            localStorage.setItem('authTokens', JSON.stringify(data));
+        } else {
+            logoutUser();
+        }
+
+        if (loading) {
+            setLoading(false);
+        }
     };
 
     const contextData = {
-        user: user,
-        authTokens: authTokens,
-        loginUser: loginUser,
-        logoutUser: logoutUser,
+        user,
+        authTokens,
+        loginUser,
+        logoutUser,
     };
 
     useEffect(() => {
-        // This effect ensures the user state is updated if the token changes
-        if (authTokens) {
-            setUser(jwtDecode(authTokens.access));
+        if (loading) {
+            if (authTokens) {
+                updateToken();
+            } else {
+                setLoading(false);
+            }
         }
-        setLoading(false);
-    }, [authTokens]);
+        
+        const fourMinutes = 1000 * 60 * 4;
+        let interval = setInterval(() => {
+            if (authTokens) {
+                updateToken();
+            }
+        }, fourMinutes);
+
+
+        return () => clearInterval(interval);
+
+    }, [authTokens, loading]);
 
     return(
         <AuthContext.Provider value={contextData} >
