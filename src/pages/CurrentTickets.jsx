@@ -72,54 +72,56 @@ export default function CurrentTickets() {
         initialLoad();
     }, [fetchTickets, authTokens]);
 
-    const handleTicketUpdate = async (ticketId, field, value) => {
-        setAssigningTicketId(null);
-        // When assigning an agent, also update the status to 'Open'
+const handleTicketUpdate = async (ticketId, field, value) => {
+    setAssigningTicketId(null); // Close the dropdown
+
+    // Keep a copy of the original tickets in case we need to revert the change
+    const originalTickets = tickets;
+
+    // Optimistically update the UI right away
+    setTickets(prevTickets =>
+        prevTickets.map(ticket => {
+            if (ticket.id === ticketId) {
+                const updatedTicket = { ...ticket, [field]: value };
+                // When assigning an agent, also change status to 'Open'
+                if (field === 'agent' && value) {
+                    updatedTicket.status = 'Open';
+                }
+                return updatedTicket;
+            }
+            return ticket;
+        })
+    );
+
+    try {
+        // Prepare the data to send to the server
         const payload = { [field]: value };
-        if (field === 'agent') {
+        if (field === 'agent' && value) {
             payload.status = 'Open';
         }
 
-        try {
-            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authTokens.access}`
-                },
-                body: JSON.stringify(payload),
-            });
-            if (!response.ok) {
-                throw new Error("Failed to update ticket on server.");
-            }
-            await fetchTickets();
-        } catch (err) {
-            console.error('Failed to update ticket:', err);
-        }
-    };
-
-    const allTicketGroups = useMemo(() => {
-        const groups = {
-            'Unassigned Tickets': [],
-            'Open Tickets': [],
-            'Waiting for Response': [],
-            'Resolved Tickets': [],
-        };
-        
-        tickets.forEach(ticket => {
-            const status = (ticket.status || 'New').toLowerCase();
-            if (!ticket.agent) {
-                groups['Unassigned Tickets'].push(ticket);
-            } else if (['open', 'new', 'in progress', 'new reply'].includes(status)) {
-                groups['Open Tickets'].push(ticket);
-            } else if (status === 'awaiting customer') {
-                groups['Waiting for Response'].push(ticket);
-            } else if (status === 'resolved') {
-                groups['Resolved Tickets'].push(ticket);
-            }
+        // Send the update request to the server
+        const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authTokens.access}`
+            },
+            body: JSON.stringify(payload),
         });
-        return groups;
-    }, [tickets]);
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Server update failed: ${errorData}`);
+        }
+
+
+    } catch (err) {
+        console.error('Failed to update ticket:', err);
+
+        setTickets(originalTickets);
+    }
+};
     
     const isITStaff = user?.groups?.includes('IT Staff');
 
