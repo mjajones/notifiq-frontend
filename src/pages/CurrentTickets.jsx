@@ -1,5 +1,3 @@
-// src/pages/CurrentTickets.jsx
-
 import React, { useEffect, useState, useMemo, useContext, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaUserPlus } from 'react-icons/fa';
@@ -34,7 +32,7 @@ export default function CurrentTickets() {
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-    // --- FIX: Create a memoized fetch function that can be reused ---
+    // --- FIX: Create a reusable fetch function ---
     const fetchTickets = useCallback(async () => {
         if (!authTokens) {
             setLoading(false);
@@ -55,8 +53,8 @@ export default function CurrentTickets() {
     useEffect(() => {
         const initialLoad = async () => {
             setLoading(true);
-            await fetchTickets();
-            // Also fetch users for the assignment dropdown
+            await fetchTickets(); // Initial ticket fetch
+            
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, {
                     headers: { 'Authorization': `Bearer ${authTokens.access}` }
@@ -70,11 +68,12 @@ export default function CurrentTickets() {
                 setLoading(false);
             }
         };
+
         initialLoad();
-    }, [fetchTickets]);
+    }, [fetchTickets, authTokens]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        setAssigningTicketId(null); // Close the assignment dropdown
+        setAssigningTicketId(null); // Close the dropdown immediately
         try {
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
@@ -87,15 +86,16 @@ export default function CurrentTickets() {
             if (!response.ok) {
                 throw new Error("Failed to update ticket on server.");
             }
-            // --- FIX: Re-fetch tickets after a successful update to get the latest data ---
+            // --- FIX #2: Re-fetch the entire ticket list after a successful update ---
             await fetchTickets();
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            // Optionally, show an error message to the user
+            // Optionally, show an error message to the user here
         }
     };
 
-    const groupedTickets = useMemo(() => {
+    const allTicketGroups = useMemo(() => {
+        // --- FIX #1: Always define all groups ---
         const groups = {
             'Unassigned Tickets': [],
             'Open Tickets': [],
@@ -131,8 +131,9 @@ export default function CurrentTickets() {
                 </h1>
             </header>
 
-            {Object.entries(groupedTickets).map(([groupName, groupTickets]) => (
+            {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
+                    {/* Dynamic coloring for group headers */}
                     <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
                         groupName === 'Unassigned Tickets' ? 'text-red-600' : 
                         groupName === 'Open Tickets' ? 'text-blue-600' :
