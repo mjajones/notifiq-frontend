@@ -28,11 +28,11 @@ export default function CurrentTickets() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [assigningTicketId, setAssigningTicketId] = useState(null);
+    const [isUpdating, setIsUpdating] = useState(false);
     const { authTokens, user } = useContext(AuthContext);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-    // --- FIX: Create a reusable fetch function ---
     const fetchTickets = useCallback(async () => {
         if (!authTokens) {
             setLoading(false);
@@ -51,16 +51,18 @@ export default function CurrentTickets() {
     }, [authTokens, API_URL]);
     
     useEffect(() => {
+        if (isUpdating) return;
+
         const initialLoad = async () => {
             setLoading(true);
-            await fetchTickets(); // Initial ticket fetch
+            await fetchTickets();
             
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, {
                     headers: { 'Authorization': `Bearer ${authTokens.access}` }
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
-                const usersData = await response.json();
+                const usersData = await usersResponse.json();
                 setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
@@ -70,32 +72,43 @@ export default function CurrentTickets() {
         };
 
         initialLoad();
-    }, [fetchTickets, authTokens]);
+    }, [fetchTickets, authTokens, isUpdating]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        setAssigningTicketId(null); // Close the dropdown immediately
+        setIsUpdating(true);
+        setAssigningTicketId(null);
+
         try {
+            const formData = new FormData();
+            formData.append(field, value);
+            
+            if (field === 'agent' && value) {
+                formData.append('status', 'Open');
+            }
+
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authTokens.access}`
                 },
-                body: JSON.stringify({ [field]: value }),
+                body: formData,
             });
+
             if (!response.ok) {
-                throw new Error("Failed to update ticket on server.");
+                const errorText = await response.text();
+                throw new Error(`Server update failed: ${response.status} ${errorText}`);
             }
-            // --- FIX #2: Re-fetch the entire ticket list after a successful update ---
+            
             await fetchTickets();
+
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            // Optionally, show an error message to the user here
+        } finally {
+            setIsUpdating(false);
         }
     };
 
     const allTicketGroups = useMemo(() => {
-        // --- FIX #1: Always define all groups ---
         const groups = {
             'Unassigned Tickets': [],
             'Open Tickets': [],
@@ -133,7 +146,6 @@ export default function CurrentTickets() {
 
             {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    {/* Dynamic coloring for group headers */}
                     <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
                         groupName === 'Unassigned Tickets' ? 'text-red-600' : 
                         groupName === 'Open Tickets' ? 'text-blue-600' :
