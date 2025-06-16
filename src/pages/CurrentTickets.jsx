@@ -63,7 +63,10 @@ export default function CurrentTickets() {
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 const usersData = await usersResponse.json();
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(data) ? data : []));
+                
+                // This line has been corrected to properly load the IT staff list.
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
             } finally {
@@ -79,7 +82,6 @@ export default function CurrentTickets() {
         setAssigningTicketId(null);
 
         try {
-            // Create a FormData object to send the data
             const formData = new FormData();
             formData.append(field, value);
             
@@ -90,8 +92,6 @@ export default function CurrentTickets() {
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
-                    // IMPORTANT: When using FormData, the browser sets the Content-Type
-                    // header automatically. Do NOT set it manually.
                     'Authorization': `Bearer ${authTokens.access}`
                 },
                 body: formData,
