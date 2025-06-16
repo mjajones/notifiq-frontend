@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo, useContext } from 'react';
+import React, { useEffect, useState, useMemo, useContext, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaUserPlus } from 'react-icons/fa';
 import AuthContext from '../context/AuthContext.jsx';
 import StatusSelector from '../components/ui/StatusSelector.jsx';
 
-// --- Configuration for Status and Priority Dropdowns ---
+// --- Configuration for Dropdowns ---
 const statusOptions = [
     { value: 'New', label: 'New', colorClass: 'bg-gray-400' },
     { value: 'Open', label: 'Open', colorClass: 'bg-blue-400' },
@@ -27,56 +27,56 @@ export default function CurrentTickets() {
     const [itStaff, setItStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [assigningTicketId, setAssigningTicketId] = useState(null); // State to track which agent dropdown is open
-    const { authTokens } = useContext(AuthContext);
+    const [assigningTicketId, setAssigningTicketId] = useState(null);
+    const { authTokens, user } = useContext(AuthContext); // Get user for role checking
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+    // --- Data Fetching ---
+    const fetchTickets = async () => {
+        if (!authTokens) {
+            setLoading(false);
+            return;
+        }
+        try {
+            const response = await fetch(`${API_URL}/api/incidents/`, {
+                headers: { 'Authorization': `Bearer ${authTokens.access}` }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+    
     useEffect(() => {
         const fetchData = async () => {
-            if (!authTokens) {
-                setLoading(false);
-                return;
-            }
+            setLoading(true);
+            await fetchTickets(); // Fetch tickets initially
+            
+            // Also fetch users for the assignment dropdown
             try {
-                // Fetch both tickets and users at the same time for efficiency
-                const [ticketsResponse, usersResponse] = await Promise.all([
-                    fetch(`${API_URL}/api/incidents/`, {
-                        headers: { 'Authorization': `Bearer ${authTokens.access}` }
-                    }),
-                    fetch(`${API_URL}/api/users/`, {
-                        headers: { 'Authorization': `Bearer ${authTokens.access}` }
-                    })
-                ]);
-
-                if (!ticketsResponse.ok) throw new Error(`HTTP ${ticketsResponse.status} fetching tickets`);
+                const usersResponse = await fetch(`${API_URL}/api/users/`, {
+                    headers: { 'Authorization': `Bearer ${authTokens.access}` }
+                });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
-                
-                const ticketsData = await ticketsResponse.json();
                 const usersData = await usersResponse.json();
-
-                setTickets(Array.isArray(ticketsData.results) ? ticketsData.results : (Array.isArray(ticketsData) ? ticketsData : []));
                 setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
-
             } catch (err) {
-                setError(err.message);
+                console.error("Failed to fetch users for assignment", err);
             } finally {
                 setLoading(false);
             }
         };
+
         fetchData();
     }, [authTokens]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        const originalTickets = [...tickets];
-        const updatedTickets = tickets.map(t =>
-            t.id === ticketId ? { ...t, [field]: value } : t
-        );
-        setTickets(updatedTickets);
-        setAssigningTicketId(null); // Close the assignment dropdown after selection
-
+        setAssigningTicketId(null); // Close the assignment dropdown
         try {
-            await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -84,13 +84,18 @@ export default function CurrentTickets() {
                 },
                 body: JSON.stringify({ [field]: value }),
             });
+            if (!response.ok) {
+                throw new Error("Failed to update ticket on server.");
+            }
+            // --- FIX: Re-fetch tickets after a successful update to get the latest data ---
+            await fetchTickets();
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            setTickets(originalTickets); // Revert on failure
+            // Optionally, show an error message to the user
         }
     };
 
-    const allTicketGroups = useMemo(() => {
+    const groupedTickets = useMemo(() => {
         const groups = {
             'Unassigned Tickets': [],
             'Open Tickets': [],
@@ -110,21 +115,24 @@ export default function CurrentTickets() {
                 groups['Resolved Tickets'].push(ticket);
             }
         });
-
-        return groups; // Return all groups, even if they are empty
+        return groups;
     }, [tickets]);
+    
+    const isITStaff = user?.groups?.includes('IT Staff');
 
     if (loading) return <p className="p-8 text-text-secondary">Loading tickets...</p>;
     if (error) return <p className="p-8 text-red-500">Error: {error}</p>;
 
     return (
         <div className="flex-1 p-6 md:p-8 space-y-8">
-            <header className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-text-primary">All Tickets</h1>
-                {/* Other controls can be added here */}
+            <header>
+                {/* --- FIX: Dynamic Page Title --- */}
+                <h1 className="text-3xl font-bold text-text-primary">
+                    {isITStaff ? 'All Tickets' : 'My Tickets'}
+                </h1>
             </header>
 
-            {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
+            {Object.entries(groupedTickets).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
                     <h2 className="text-sm font-bold text-violet-600 mb-2 uppercase tracking-wider">{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
@@ -136,7 +144,7 @@ export default function CurrentTickets() {
                             <div className="p-2 border-l border-border">Priority</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
-                        {groupTickets.length > 0 ? groupTickets.map(ticket => {
+                        {groupTickets.map(ticket => {
                             const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                             return (
                                 <div key={ticket.id} className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] items-center border-t border-border hover:bg-gray-50/50">
@@ -179,7 +187,7 @@ export default function CurrentTickets() {
                                     </div>
                                 </div>
                             )
-                        }) : null}
+                        })}
                          <div className="border-t border-border p-2 pl-12">
                             <Link to="/tickets/create" className="flex items-center gap-2 text-text-secondary hover:text-primary text-sm">
                                 <FaPlus size={12} /> Add Ticket
@@ -187,7 +195,7 @@ export default function CurrentTickets() {
                         </div>
                     </div>
                 </div>
-            )) : <p className="text-text-secondary">No tickets to display.</p>}
+            ))}
         </div>
     );
 }
