@@ -28,6 +28,7 @@ export default function CurrentTickets() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [assigningTicketId, setAssigningTicketId] = useState(null);
+    const [isUpdating, setIsUpdating] = useState(false); // New state to prevent race conditions
     const { authTokens, user } = useContext(AuthContext);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -50,9 +51,12 @@ export default function CurrentTickets() {
     }, [authTokens, API_URL]);
     
     useEffect(() => {
+        // This function will not run if a ticket update is already in progress
+        if (isUpdating) return;
+
         const initialLoad = async () => {
             setLoading(true);
-            await fetchTickets(); // Initial ticket fetch
+            await fetchTickets();
             
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, {
@@ -69,27 +73,11 @@ export default function CurrentTickets() {
         };
 
         initialLoad();
-    }, [fetchTickets, authTokens]);
+    }, [fetchTickets, authTokens, isUpdating]); // Add isUpdating to the dependency array
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        setAssigningTicketId(null); // Close the dropdown
-
-        const originalTickets = tickets;
-
-        // Optimistically update the UI right away
-        setTickets(prevTickets =>
-            prevTickets.map(ticket => {
-                if (ticket.id === ticketId) {
-                    const updatedTicket = { ...ticket, [field]: value };
-                    // When assigning an agent, also change status to 'Open'
-                    if (field === 'agent' && value) {
-                        updatedTicket.status = 'Open';
-                    }
-                    return updatedTicket;
-                }
-                return ticket;
-            })
-        );
+        setIsUpdating(true); // Lock the state to prevent other fetches
+        setAssigningTicketId(null);
 
         try {
             const payload = { [field]: value };
@@ -107,14 +95,19 @@ export default function CurrentTickets() {
             });
 
             if (!response.ok) {
-                const errorData = await response.text();
-                throw new Error(`Server update failed: ${errorData}`);
+                throw new Error("Server update failed");
             }
+            
+            // After the server is successfully updated, fetch the fresh ticket list.
+            await fetchTickets();
 
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            // If the update failed, revert the UI to its original state
-            setTickets(originalTickets);
+            // If the update fails, you might want to show an error message.
+            // We re-fetch in the finally block to ensure the UI is accurate.
+        } finally {
+            // Release the lock so background fetches can resume.
+            setIsUpdating(false);
         }
     };
 
