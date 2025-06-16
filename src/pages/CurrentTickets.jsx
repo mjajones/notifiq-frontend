@@ -63,7 +63,7 @@ export default function CurrentTickets() {
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 const usersData = await usersResponse.json();
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(data) ? data : []));
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
             } finally {
@@ -79,18 +79,22 @@ export default function CurrentTickets() {
         setAssigningTicketId(null);
 
         try {
-            const payload = { [field]: value };
+            // Create a FormData object to send the data
+            const formData = new FormData();
+            formData.append(field, value);
+            
             if (field === 'agent' && value) {
-                payload.status = 'Open';
+                formData.append('status', 'Open');
             }
 
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json', // This header is crucial
+                    // IMPORTANT: When using FormData, the browser sets the Content-Type
+                    // header automatically. Do NOT set it manually.
                     'Authorization': `Bearer ${authTokens.access}`
                 },
-                body: JSON.stringify(payload),
+                body: formData,
             });
 
             if (!response.ok) {
