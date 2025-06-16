@@ -73,7 +73,13 @@ export default function CurrentTickets() {
     }, [fetchTickets, authTokens]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        setAssigningTicketId(null); // Close the dropdown immediately
+        setAssigningTicketId(null);
+        // When assigning an agent, also update the status to 'Open'
+        const payload = { [field]: value };
+        if (field === 'agent') {
+            payload.status = 'Open';
+        }
+
         try {
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
@@ -81,21 +87,18 @@ export default function CurrentTickets() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authTokens.access}`
                 },
-                body: JSON.stringify({ [field]: value }),
+                body: JSON.stringify(payload),
             });
             if (!response.ok) {
                 throw new Error("Failed to update ticket on server.");
             }
-            // --- FIX #2: Re-fetch the entire ticket list after a successful update ---
             await fetchTickets();
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            // Optionally, show an error message to the user here
         }
     };
 
     const allTicketGroups = useMemo(() => {
-        // --- FIX #1: Always define all groups ---
         const groups = {
             'Unassigned Tickets': [],
             'Open Tickets': [],
@@ -133,7 +136,6 @@ export default function CurrentTickets() {
 
             {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    {/* Dynamic coloring for group headers */}
                     <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
                         groupName === 'Unassigned Tickets' ? 'text-red-600' : 
                         groupName === 'Open Tickets' ? 'text-blue-600' :
