@@ -79,9 +79,11 @@ export default function CurrentTickets() {
         setAssigningTicketId(null);
 
         try {
+            // Use FormData to send the update
             const formData = new FormData();
             formData.append(field, value);
             
+            // If assigning an agent, also set the status to Open
             if (field === 'agent' && value) {
                 formData.append('status', 'Open');
             }
@@ -89,6 +91,7 @@ export default function CurrentTickets() {
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
+                    // Do not set Content-Type, the browser will do it for FormData
                     'Authorization': `Bearer ${authTokens.access}`
                 },
                 body: formData,
@@ -99,6 +102,7 @@ export default function CurrentTickets() {
                 throw new Error(`Server update failed: ${response.status} ${errorText}`);
             }
             
+            // Refresh the ticket list to show the change
             await fetchTickets();
 
         } catch (err) {
@@ -168,7 +172,12 @@ export default function CurrentTickets() {
                                     <div className="p-2 pl-4 text-center">
                                         <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
                                     </div>
-                                    <div className="p-2 border-l border-border font-medium text-text-primary">{ticket.title}</div>
+                                    {/* This now links to the ticket detail page */}
+                                    <div className="p-2 border-l border-border font-medium text-text-primary">
+                                        <Link to={`/tickets/${ticket.id}`} className="hover:underline">
+                                            {ticket.title}
+                                        </Link>
+                                    </div>
                                     <div className="p-2 border-l border-border flex items-center justify-center relative">
                                         <button 
                                           onClick={() => setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id)}
