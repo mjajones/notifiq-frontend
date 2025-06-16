@@ -1,12 +1,50 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { FiSend, FiMail, FiUser, FiInfo } from 'react-icons/fi';
+import { FiSend, FiMail, FiUser, FiInfo, FiEdit2 } from 'react-icons/fi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const inputClass = "w-full bg-foreground p-2 rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow text-text-primary placeholder:text-text-secondary/50";
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
+
+const ActivityItem = ({ item }) => {
+    const getIcon = () => {
+        switch (item.activity_type) {
+            case 'Note Added': return <FiUser size={20} />;
+            case 'Status Change':
+            case 'Priority Change':
+            case 'Agent Change':
+                 return <FiEdit2 size={20} />;
+            default: return <FiInfo size={20} />;
+        }
+    };
+
+    return (
+        <div className="flex gap-4">
+            <div className="bg-gray-100 text-gray-600 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
+                {getIcon()}
+            </div>
+            <div className="bg-foreground rounded-lg border border-border p-4 w-full">
+                <p className="font-semibold text-text-primary">{item.user || 'System'}</p>
+                <p className="text-sm text-text-secondary mb-2">
+                    {new Date(item.timestamp).toLocaleString()}
+                </p>
+                <div className="prose prose-sm max-w-none text-text-primary">
+                    {item.activity_type === 'Note Added' && <p>{item.note}</p>}
+                    {item.activity_type.includes('Change') && (
+                        <p>
+                            Changed <span className="font-semibold">{item.activity_type.split(' ')[0]}</span> from 
+                            <span className="font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-md mx-1">{item.old_value || 'None'}</span> to 
+                            <span className="font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md mx-1">{item.new_value || 'None'}</span>.
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 export default function TicketDetail() {
     const { ticketId } = useParams();
@@ -51,8 +89,7 @@ export default function TicketDetail() {
                 body: formData
             });
             if (!response.ok) throw new Error('Failed to update ticket.');
-            const data = await response.json();
-            setTicket(data);
+            await fetchTicketDetails(); // Re-fetch to get all updates
         } catch (error) {
             console.error("Update failed:", error);
         }
@@ -73,14 +110,13 @@ export default function TicketDetail() {
             });
             if (!response.ok) throw new Error('Failed to add note.');
             
-            // Re-fetch the ticket to get the latest activity log
             await fetchTicketDetails();
             setNote('');
         } catch (error) {
             console.error("Failed to add note:", error);
         }
     };
-
+    
     const handleNewEmail = () => {
         alert("New Email functionality would be triggered here.");
     };
@@ -123,13 +159,12 @@ export default function TicketDetail() {
                     <div className="space-y-4">
                         <h2 className="text-lg font-semibold text-text-primary">Activity</h2>
                         
-                        {/* Original Ticket Description */}
                         <div className="flex gap-4">
                             <div className="bg-blue-100 text-blue-600 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
                                 <FiInfo size={20} />
                             </div>
                             <div className="bg-foreground rounded-lg border border-border p-4 w-full">
-                                <p className="font-semibold text-text-primary">{ticket.requester || 'Requester'}</p>
+                                <p className="font-semibold text-text-primary">{ticket.requester_name || 'Requester'}</p>
                                 <p className="text-sm text-text-secondary mb-2">
                                     created the ticket on {new Date(ticket.submitted_at).toLocaleString()}
                                 </p>
@@ -139,22 +174,8 @@ export default function TicketDetail() {
                             </div>
                         </div>
 
-                        {/* Activity Log */}
-                        {ticket.activity_log && ticket.activity_log.map((item, index) => (
-                             <div key={index} className="flex gap-4">
-                                <div className="bg-gray-100 text-gray-600 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
-                                    <FiUser size={20} />
-                                </div>
-                                <div className="bg-foreground rounded-lg border border-border p-4 w-full">
-                                    <p className="font-semibold text-text-primary">{item.user || 'User'}</p>
-                                    <p className="text-sm text-text-secondary mb-2">
-                                        added a note on {new Date(item.timestamp).toLocaleString()}
-                                    </p>
-                                    <div className="prose prose-sm max-w-none text-text-primary">
-                                        <p>{item.note}</p>
-                                    </div>
-                                </div>
-                            </div>
+                        {ticket.activity_log && ticket.activity_log.map((item) => (
+                             <ActivityItem key={item.id} item={item} />
                         ))}
                     </div>
                 </div>
@@ -177,7 +198,7 @@ export default function TicketDetail() {
                             </div>
                             <div>
                                 <p className={labelClass}>Requester</p>
-                                <p className="text-text-primary">{ticket.requester || 'N/A'}</p>
+                                <p className="text-text-primary">{ticket.requester_name || 'N/A'}</p>
                             </div>
                             <div>
                                 <p className={labelClass}>Agent</p>
@@ -185,7 +206,7 @@ export default function TicketDetail() {
                             </div>
                              <div>
                                 <p className={labelClass}>Created</p>
-                                <p className="text-text-primary">{new Date(ticket.submitted_at).toLocaleString()}</p>
+                                <p className="text-text-primary">{new Date(ticket.created_at || ticket.submitted_at).toLocaleString()}</p>
                             </div>
                         </div>
                     </div>
