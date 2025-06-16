@@ -32,7 +32,6 @@ export default function CurrentTickets() {
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-    // --- FIX: Create a reusable fetch function ---
     const fetchTickets = useCallback(async () => {
         if (!authTokens) {
             setLoading(false);
@@ -72,56 +71,75 @@ export default function CurrentTickets() {
         initialLoad();
     }, [fetchTickets, authTokens]);
 
-const handleTicketUpdate = async (ticketId, field, value) => {
-    setAssigningTicketId(null); // Close the dropdown
+    const handleTicketUpdate = async (ticketId, field, value) => {
+        setAssigningTicketId(null); // Close the dropdown
 
-    // Keep a copy of the original tickets in case we need to revert the change
-    const originalTickets = tickets;
+        const originalTickets = tickets;
 
-    // Optimistically update the UI right away
-    setTickets(prevTickets =>
-        prevTickets.map(ticket => {
-            if (ticket.id === ticketId) {
-                const updatedTicket = { ...ticket, [field]: value };
-                // When assigning an agent, also change status to 'Open'
-                if (field === 'agent' && value) {
-                    updatedTicket.status = 'Open';
+        // Optimistically update the UI right away
+        setTickets(prevTickets =>
+            prevTickets.map(ticket => {
+                if (ticket.id === ticketId) {
+                    const updatedTicket = { ...ticket, [field]: value };
+                    // When assigning an agent, also change status to 'Open'
+                    if (field === 'agent' && value) {
+                        updatedTicket.status = 'Open';
+                    }
+                    return updatedTicket;
                 }
-                return updatedTicket;
+                return ticket;
+            })
+        );
+
+        try {
+            const payload = { [field]: value };
+            if (field === 'agent' && value) {
+                payload.status = 'Open';
             }
-            return ticket;
-        })
-    );
 
-    try {
-        // Prepare the data to send to the server
-        const payload = { [field]: value };
-        if (field === 'agent' && value) {
-            payload.status = 'Open';
+            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authTokens.access}`
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Server update failed: ${errorData}`);
+            }
+
+        } catch (err) {
+            console.error('Failed to update ticket:', err);
+            // If the update failed, revert the UI to its original state
+            setTickets(originalTickets);
         }
+    };
 
-        // Send the update request to the server
-        const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authTokens.access}`
-            },
-            body: JSON.stringify(payload),
+    const allTicketGroups = useMemo(() => {
+        const groups = {
+            'Unassigned Tickets': [],
+            'Open Tickets': [],
+            'Waiting for Response': [],
+            'Resolved Tickets': [],
+        };
+        
+        tickets.forEach(ticket => {
+            const status = (ticket.status || 'New').toLowerCase();
+            if (!ticket.agent) {
+                groups['Unassigned Tickets'].push(ticket);
+            } else if (['open', 'new', 'in progress', 'new reply'].includes(status)) {
+                groups['Open Tickets'].push(ticket);
+            } else if (status === 'awaiting customer') {
+                groups['Waiting for Response'].push(ticket);
+            } else if (status === 'resolved') {
+                groups['Resolved Tickets'].push(ticket);
+            }
         });
-
-        if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(`Server update failed: ${errorData}`);
-        }
-
-
-    } catch (err) {
-        console.error('Failed to update ticket:', err);
-
-        setTickets(originalTickets);
-    }
-};
+        return groups;
+    }, [tickets]);
     
     const isITStaff = user?.groups?.includes('IT Staff');
 
