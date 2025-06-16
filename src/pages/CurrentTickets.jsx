@@ -1,20 +1,17 @@
 import React, { useEffect, useState, useMemo, useContext } from 'react';
-import AuthContext from '/src/context/AuthContext.jsx';
-import StatusSelector from '/src/components/ui/StatusSelector.jsx';
+import { Link } from 'react-router-dom';
+import { FaPlus, FaUserPlus } from 'react-icons/fa';
+import AuthContext from '../context/AuthContext.jsx';
+import StatusSelector from '../components/ui/StatusSelector.jsx'; // Assuming this component exists
 
-const FaPlus = (props) => (
-    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path>
-    </svg>
-);
-
-
+// --- Configuration for Status and Priority Dropdowns ---
+// (These should match the options used in your StatusSelector component)
 const statusOptions = [
     { value: 'New', label: 'New', colorClass: 'bg-gray-400' },
     { value: 'Open', label: 'Open', colorClass: 'bg-blue-400' },
     { value: 'In Progress', label: 'In Progress', colorClass: 'bg-indigo-500' },
     { value: 'Awaiting customer', label: 'Awaiting customer', colorClass: 'bg-purple-500' },
-    { value: 'New reply', label: 'New reply', colorClass: 'bg-blue-500' },
+    { value: 'New reply', label: 'New reply', colorClass: 'bg-cyan-500' },
     { value: 'Resolved', label: 'Resolved', colorClass: 'bg-green-500' },
 ];
 
@@ -26,54 +23,59 @@ const priorityOptions = [
     { value: 'Critical', label: 'Critical', colorClass: 'bg-black' },
 ];
 
+
 export default function CurrentTickets() {
     const [tickets, setTickets] = useState([]);
+    const [itStaff, setItStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [assigningTicket, setAssigningTicket] = useState(null); // State to track which ticket is being assigned
     const { authTokens } = useContext(AuthContext);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     useEffect(() => {
-        const fetchTickets = async () => {
+        const fetchData = async () => {
             if (!authTokens) {
                 setLoading(false);
                 return;
             }
             try {
-                const response = await fetch(`${API_URL}/api/incidents/`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // 4. Add the Authorization header
-                        'Authorization': `Bearer ${authTokens.access}`
-                    }
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status} Unauthorized`);
-                const data = await response.json();
+                // Fetch both tickets and users at the same time
+                const [ticketsResponse, usersResponse] = await Promise.all([
+                    fetch(`${API_URL}/api/incidents/`, {
+                        headers: { 'Authorization': `Bearer ${authTokens.access}` }
+                    }),
+                    fetch(`${API_URL}/api/users/`, {
+                        headers: { 'Authorization': `Bearer ${authTokens.access}` }
+                    })
+                ]);
+
+                if (!ticketsResponse.ok) throw new Error(`HTTP ${ticketsResponse.status} fetching tickets`);
+                if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 
-                // Handle paginated responses from Django Rest Framework
-                if (data && Array.isArray(data.results)) {
-                    setTickets(data.results);
-                } else if (Array.isArray(data)) {
-                    setTickets(data);
-                } else {
-                    setTickets([]);
-                }
+                const ticketsData = await ticketsResponse.json();
+                const usersData = await usersResponse.json();
+
+                setTickets(Array.isArray(ticketsData.results) ? ticketsData.results : (Array.isArray(ticketsData) ? ticketsData : []));
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+
             } catch (err) {
                 setError(err.message);
             } finally {
                 setLoading(false);
             }
         };
-        fetchTickets();
+        fetchData();
     }, [authTokens]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         const originalTickets = [...tickets];
-        const updatedTickets = tickets.map(t => 
+        const updatedTickets = tickets.map(t =>
             t.id === ticketId ? { ...t, [field]: value } : t
         );
         setTickets(updatedTickets);
+        setAssigningTicket(null); // Close the assignment dropdown
 
         try {
             await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
@@ -86,12 +88,12 @@ export default function CurrentTickets() {
             });
         } catch (err) {
             console.error('Failed to update ticket:', err);
-            setTickets(originalTickets);
+            setTickets(originalTickets); // Revert on failure
         }
     };
 
     const groupedTickets = useMemo(() => {
-        if (!tickets) return {}; 
+        if (!tickets) return {};
         const groups = {
             'Unassigned Tickets': [],
             'Open Tickets': [],
@@ -100,7 +102,7 @@ export default function CurrentTickets() {
         };
         
         tickets.forEach(ticket => {
-            const status = (ticket.status || '').toLowerCase();
+            const status = (ticket.status || 'New').toLowerCase();
             if (!ticket.agent) {
                 groups['Unassigned Tickets'].push(ticket);
             } else if (status === 'open' || status === 'new' || status === 'in progress' || status === 'new reply') {
@@ -112,6 +114,7 @@ export default function CurrentTickets() {
             }
         });
 
+        // Filter out any groups that have no tickets
         return Object.fromEntries(Object.entries(groups).filter(([_, v]) => v.length > 0));
     }, [tickets]);
 
@@ -121,56 +124,75 @@ export default function CurrentTickets() {
     return (
         <div className="flex-1 p-6 md:p-8 space-y-8">
             <header className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-text-primary">My Tickets</h1>
-                <button className="flex items-center gap-2 bg-primary text-white px-3 py-1.5 rounded-md hover:bg-primary-hover text-sm">
-                    <FaPlus /> New Ticket
-                </button>
+                <h1 className="text-3xl font-bold text-text-primary">All Tickets</h1>
+                {/* Add other controls like Search and Filter here later */}
             </header>
 
             {Object.keys(groupedTickets).length > 0 ? Object.entries(groupedTickets).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    <h2 className="text-sm font-bold text-red-600 mb-2 uppercase tracking-wider">{groupName}</h2>
-                    <div className="bg-foreground rounded-lg border border-border shadow-sm">
-                        <div className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_1fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
-                            <div className="p-2 pl-4"></div>
+                    <h2 className="text-sm font-bold text-violet-600 mb-2 uppercase tracking-wider">{groupName} ({groupTickets.length})</h2>
+                    <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
+                        <div className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
+                            <div className="p-2 pl-4 w-12"></div>
                             <div className="p-2 border-l border-border">Ticket</div>
-                            <div className="p-2 border-l border-border">Agent</div>
+                            <div className="p-2 border-l border-border text-center">Agent</div>
                             <div className="p-2 border-l border-border">Status</div>
                             <div className="p-2 border-l border-border">Priority</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
-                            <div className="p-2 border-l border-border">Email</div>
                         </div>
                         {groupTickets.map(ticket => (
-                            <div key={ticket.id} className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_1fr_2fr] items-center border-t border-border hover:bg-gray-50/50 text-sm">
+                            <div key={ticket.id} className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] items-center border-t border-border hover:bg-gray-50/50">
                                 <div className="p-2 pl-4 text-center">
                                     <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
                                 </div>
                                 <div className="p-2 border-l border-border font-medium text-text-primary">{ticket.title}</div>
-                                <div className="p-2 border-l border-border flex items-center justify-center">
-                                    <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold">
-                                        {ticket.agent ? 'A' : '?'}
-                                    </div>
+                                <div className="p-2 border-l border-border flex items-center justify-center relative">
+                                    <button 
+                                      onClick={() => setAssigningTicket(assigningTicket === ticket.id ? null : ticket.id)}
+                                      className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors"
+                                    >
+                                        <FaUserPlus />
+                                    </button>
+                                    {assigningTicket === ticket.id && (
+                                        <div className="absolute top-full mt-2 w-48 bg-white border border-border rounded-md shadow-lg z-20">
+                                            <ul>
+                                                {itStaff.map(staff => (
+                                                    <li 
+                                                      key={staff.id} 
+                                                      onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)}
+                                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                                    >
+                                                        {`${staff.first_name} ${staff.last_name}`.trim() || staff.username}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="p-2 border-l border-border">
                                     <StatusSelector
                                         options={statusOptions}
-                                        value={ticket.status || ''}
+                                        value={ticket.status}
                                         onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)}
                                     />
                                 </div>
                                 <div className="p-2 border-l border-border">
                                     <StatusSelector
                                         options={priorityOptions}
-                                        value={ticket.priority || ''}
+                                        value={ticket.priority}
                                         onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)}
                                     />
                                 </div>
                                 <div className="p-2 border-l border-border text-text-secondary">
                                     {new Date(ticket.submitted_at).toLocaleDateString()}
                                 </div>
-                                <div className="p-2 border-l border-border text-text-secondary">{ticket.requester_email || '-'}</div>
                             </div>
                         ))}
+                         <div className="border-t border-border p-2 pl-4">
+                            <Link to="/tickets/create" className="flex items-center gap-2 text-text-secondary hover:text-primary text-sm">
+                                <FaPlus size={12} /> Add Ticket
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )) : <p className="text-text-secondary">No tickets to display.</p>}
