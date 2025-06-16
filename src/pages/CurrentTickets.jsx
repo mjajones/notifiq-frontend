@@ -44,6 +44,7 @@ export default function CurrentTickets() {
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
+            console.log("Fetched ticket data from server:", data); // DEBUG LOG
             setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
         } catch (err) {
             setError(err.message);
@@ -75,15 +76,14 @@ export default function CurrentTickets() {
     }, [fetchTickets, authTokens, isUpdating]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
+        console.log(`Attempting to update ticket ${ticketId} with ${field}: ${value}`); // DEBUG LOG
         setIsUpdating(true);
         setAssigningTicketId(null);
 
         try {
-            // Use FormData to send the update
             const formData = new FormData();
             formData.append(field, value);
             
-            // If assigning an agent, also set the status to Open
             if (field === 'agent' && value) {
                 formData.append('status', 'Open');
             }
@@ -91,7 +91,6 @@ export default function CurrentTickets() {
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: {
-                    // Do not set Content-Type, the browser will do it for FormData
                     'Authorization': `Bearer ${authTokens.access}`
                 },
                 body: formData,
@@ -102,7 +101,7 @@ export default function CurrentTickets() {
                 throw new Error(`Server update failed: ${response.status} ${errorText}`);
             }
             
-            // Refresh the ticket list to show the change
+            console.log("Update successful, re-fetching tickets..."); // DEBUG LOG
             await fetchTickets();
 
         } catch (err) {
@@ -172,7 +171,6 @@ export default function CurrentTickets() {
                                     <div className="p-2 pl-4 text-center">
                                         <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
                                     </div>
-                                    {/* This now links to the ticket detail page */}
                                     <div className="p-2 border-l border-border font-medium text-text-primary">
                                         <Link to={`/tickets/${ticket.id}`} className="hover:underline">
                                             {ticket.title}

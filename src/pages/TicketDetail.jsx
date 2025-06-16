@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { FiSend, FiMail } from 'react-icons/fi';
+import { FiSend, FiMail, FiUser, FiInfo } from 'react-icons/fi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// Re-using styles from other components
 const inputClass = "w-full bg-foreground p-2 rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow text-text-primary placeholder:text-text-secondary/50";
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
 
@@ -17,31 +16,29 @@ export default function TicketDetail() {
     const [error, setError] = useState(null);
     const [note, setNote] = useState('');
 
-    // Options for the dropdowns
     const statusOptions = ['New', 'Open', 'In Progress', 'Awaiting customer', 'Resolved', 'Closed'];
     const priorityOptions = ['Low', 'Medium', 'High', 'Urgent'];
 
-    useEffect(() => {
-        const fetchTicketDetails = async () => {
-            if (!authTokens) return;
-            setLoading(true);
-            try {
-                const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
-                    headers: {
-                        'Authorization': `Bearer ${authTokens.access}`
-                    }
-                });
-                if (!response.ok) throw new Error('Failed to fetch ticket details.');
-                const data = await response.json();
-                setTicket(data);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTicketDetails();
+    const fetchTicketDetails = useCallback(async () => {
+        if (!authTokens) return;
+        try {
+            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+                headers: {
+                    'Authorization': `Bearer ${authTokens.access}`
+                }
+            });
+            if (!response.ok) throw new Error('Failed to fetch ticket details.');
+            const data = await response.json();
+            setTicket(data);
+        } catch (err) {
+            setError(err.message);
+        }
     }, [ticketId, authTokens]);
+
+    useEffect(() => {
+        setLoading(true);
+        fetchTicketDetails().finally(() => setLoading(false));
+    }, [fetchTicketDetails]);
 
     const handleUpdateTicket = async (field, value) => {
         const formData = new FormData();
@@ -55,7 +52,7 @@ export default function TicketDetail() {
             });
             if (!response.ok) throw new Error('Failed to update ticket.');
             const data = await response.json();
-            setTicket(data); // Update state with the returned ticket data
+            setTicket(data);
         } catch (error) {
             console.error("Update failed:", error);
         }
@@ -75,12 +72,17 @@ export default function TicketDetail() {
                 body: formData
             });
             if (!response.ok) throw new Error('Failed to add note.');
-            const data = await response.json();
-            setTicket(data);
+            
+            // Re-fetch the ticket to get the latest activity log
+            await fetchTicketDetails();
             setNote('');
         } catch (error) {
             console.error("Failed to add note:", error);
         }
+    };
+
+    const handleNewEmail = () => {
+        alert("New Email functionality would be triggered here.");
     };
 
     if (loading) return <p className="p-8 text-text-secondary">Loading ticket...</p>;
@@ -89,16 +91,13 @@ export default function TicketDetail() {
 
     return (
         <div className="flex-1 p-6 md:p-8">
-            {/* Header */}
             <div className="mb-6">
                 <Link to="/tickets" className="text-sm text-primary hover:underline mb-2 block">&larr; Back to All Tickets</Link>
                 <p className="text-sm text-text-secondary">Ticket #{ticket.id}</p>
                 <h1 className="text-3xl font-bold text-text-primary">{ticket.title}</h1>
             </div>
 
-            {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column (Activity) */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-foreground rounded-lg border border-border shadow-sm p-4">
                         <h2 className="text-lg font-semibold mb-3 text-text-primary">Add Note / Reply</h2>
@@ -111,7 +110,7 @@ export default function TicketDetail() {
                                 placeholder="Type your note or reply to the customer here..."
                             ></textarea>
                             <div className="flex justify-end items-center mt-3 gap-4">
-                               <button type="button" className="flex items-center gap-2 bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">
+                               <button onClick={handleNewEmail} type="button" className="flex items-center gap-2 bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">
                                    <FiMail size={16} /> New Email
                                </button>
                                <button type="submit" className="flex items-center gap-2 bg-primary text-white font-semibold py-2 px-4 rounded-md hover:bg-primary-hover">
@@ -121,15 +120,45 @@ export default function TicketDetail() {
                         </form>
                     </div>
 
-                    <div className="bg-foreground rounded-lg border border-border shadow-sm p-4">
-                         <h2 className="text-lg font-semibold mb-3 text-text-primary">Activity</h2>
-                         <div className="text-center text-text-secondary py-8">
-                            <p>(Activity timeline showing notes, replies, and status changes will appear here.)</p>
-                         </div>
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-semibold text-text-primary">Activity</h2>
+                        
+                        {/* Original Ticket Description */}
+                        <div className="flex gap-4">
+                            <div className="bg-blue-100 text-blue-600 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
+                                <FiInfo size={20} />
+                            </div>
+                            <div className="bg-foreground rounded-lg border border-border p-4 w-full">
+                                <p className="font-semibold text-text-primary">{ticket.requester || 'Requester'}</p>
+                                <p className="text-sm text-text-secondary mb-2">
+                                    created the ticket on {new Date(ticket.submitted_at).toLocaleString()}
+                                </p>
+                                <div className="prose prose-sm max-w-none text-text-primary">
+                                    <p>{ticket.description}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Activity Log */}
+                        {ticket.activity_log && ticket.activity_log.map((item, index) => (
+                             <div key={index} className="flex gap-4">
+                                <div className="bg-gray-100 text-gray-600 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
+                                    <FiUser size={20} />
+                                </div>
+                                <div className="bg-foreground rounded-lg border border-border p-4 w-full">
+                                    <p className="font-semibold text-text-primary">{item.user || 'User'}</p>
+                                    <p className="text-sm text-text-secondary mb-2">
+                                        added a note on {new Date(item.timestamp).toLocaleString()}
+                                    </p>
+                                    <div className="prose prose-sm max-w-none text-text-primary">
+                                        <p>{item.note}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Right Column (Details) */}
                 <div className="space-y-6">
                     <div className="bg-foreground rounded-lg border border-border shadow-sm p-4">
                         <h2 className="text-lg font-semibold mb-4 text-text-primary">Details</h2>
