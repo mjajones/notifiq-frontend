@@ -9,6 +9,7 @@ import AssetForm from './pages/AssetForm';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import PrivateRoute from './utils/PrivateRoute';
+import TicketDetail from './pages/TicketDetail'; // 1. Import the new component
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tickets" element={<CurrentTickets />} />
           <Route path="tickets/create" element={<TicketForm />} />
+          <Route path="tickets/:ticketId" element={<TicketDetail />} /> {/* 2. Add this new route */}
           <Route path="assets/create" element={<AssetForm />} />
         </Route>
       </Route>
