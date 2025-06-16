@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useMemo, useContext, useRef } from 'react';
+// src/pages/CurrentTickets.jsx
+
+import React, { useEffect, useState, useMemo, useContext, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaUserPlus } from 'react-icons/fa';
 import AuthContext from '../context/AuthContext.jsx';
@@ -28,12 +30,12 @@ export default function CurrentTickets() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [assigningTicketId, setAssigningTicketId] = useState(null);
-    const { authTokens, user } = useContext(AuthContext); // Get user for role checking
+    const { authTokens, user } = useContext(AuthContext);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-    // --- Data Fetching ---
-    const fetchTickets = async () => {
+    // --- FIX: Create a memoized fetch function that can be reused ---
+    const fetchTickets = useCallback(async () => {
         if (!authTokens) {
             setLoading(false);
             return;
@@ -48,13 +50,12 @@ export default function CurrentTickets() {
         } catch (err) {
             setError(err.message);
         }
-    };
+    }, [authTokens, API_URL]);
     
     useEffect(() => {
-        const fetchData = async () => {
+        const initialLoad = async () => {
             setLoading(true);
-            await fetchTickets(); // Fetch tickets initially
-            
+            await fetchTickets();
             // Also fetch users for the assignment dropdown
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, {
@@ -69,9 +70,8 @@ export default function CurrentTickets() {
                 setLoading(false);
             }
         };
-
-        fetchData();
-    }, [authTokens]);
+        initialLoad();
+    }, [fetchTickets]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         setAssigningTicketId(null); // Close the assignment dropdown
@@ -107,7 +107,7 @@ export default function CurrentTickets() {
             const status = (ticket.status || 'New').toLowerCase();
             if (!ticket.agent) {
                 groups['Unassigned Tickets'].push(ticket);
-            } else if (status === 'open' || status === 'new' || status === 'in progress' || status === 'new reply') {
+            } else if (['open', 'new', 'in progress', 'new reply'].includes(status)) {
                 groups['Open Tickets'].push(ticket);
             } else if (status === 'awaiting customer') {
                 groups['Waiting for Response'].push(ticket);
@@ -126,7 +126,6 @@ export default function CurrentTickets() {
     return (
         <div className="flex-1 p-6 md:p-8 space-y-8">
             <header>
-                {/* --- FIX: Dynamic Page Title --- */}
                 <h1 className="text-3xl font-bold text-text-primary">
                     {isITStaff ? 'All Tickets' : 'My Tickets'}
                 </h1>
@@ -134,7 +133,12 @@ export default function CurrentTickets() {
 
             {Object.entries(groupedTickets).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    <h2 className="text-sm font-bold text-violet-600 mb-2 uppercase tracking-wider">{groupName} ({groupTickets.length})</h2>
+                    <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
+                        groupName === 'Unassigned Tickets' ? 'text-red-600' : 
+                        groupName === 'Open Tickets' ? 'text-blue-600' :
+                        groupName === 'Waiting for Response' ? 'text-purple-600' :
+                        'text-green-600'
+                    }`}>{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
                         <div className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
                             <div className="p-2 pl-4 w-12"></div>
