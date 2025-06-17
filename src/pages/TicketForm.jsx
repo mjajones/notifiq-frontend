@@ -51,7 +51,6 @@ export default function TicketForm() {
                 const response = await fetch(`${API_URL}/api/users/`, {
                     headers: {
                         'Content-Type': 'application/json',
-                        // Auth header
                         'Authorization': `Bearer ${authTokens.access}`
                     }
                 });
@@ -110,7 +109,13 @@ export default function TicketForm() {
         files.forEach(file => { data.append('attachments', file); });
 
         try {
-            const resp = await fetch(`${API_URL}/api/incidents/`, { method: 'POST', body: data });
+            const resp = await fetch(`${API_URL}/api/incidents/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authTokens.access}`
+                },
+                body: data
+            });
             if (resp.ok) {
                 setMessage({ type: 'success', text: 'Ticket created successfully!' });
                 setFormData({ requester: '', subject: '', source: 'portal', status: 'Open', urgency: 'Low', impact: 'Low', priority: 'Low', group: 'Level 1 Helpdesk', agent: '', department: 'IT', category: '', subCategory: '', description: '', tags: [] });
