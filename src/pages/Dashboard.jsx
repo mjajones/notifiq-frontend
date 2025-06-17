@@ -3,12 +3,13 @@ import StatsCard from '../components/StatsCard.jsx';
 import ChartCard from '../components/ChartCard.jsx';
 import AuthContext from '../context/AuthContext.jsx';
 import dayjs from 'dayjs';
+import NewTicketsChart from '../components/NewTicketsChart.jsx'; // Import the new component
 
 export default function Dashboard() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { authTokens } = useContext(AuthContext);
+  const { authTokens, user } = useContext(AuthContext); // Get user from context
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -30,14 +31,8 @@ export default function Dashboard() {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         
-        // For my responses
-        if (data && Array.isArray(data.results)) {
-            setTickets(data.results);
-        } else if (Array.isArray(data)) {
-            setTickets(data);
-        } else {
-            setTickets([]);
-        }
+        const results = data.results || (Array.isArray(data) ? data : []);
+        setTickets(results);
       } catch (err) {
         console.error('Error fetching tickets:', err);
         setError(err.message);
@@ -48,24 +43,35 @@ export default function Dashboard() {
     fetchTickets();
   }, [authTokens]);
 
-  // data calcs and jsks
+  // --- Data Calculations ---
   const now = dayjs();
-  const overdueCount = tickets.filter((t) => t.due_date && dayjs(t.due_date).isBefore(now, 'day') && t.status !== 'resolved' && t.status !== 'closed').length;
-  const dueTodayCount = tickets.filter((t) => t.due_date && dayjs(t.due_date).isSame(now, 'day')).length;
-  const openCount = tickets.filter((t) => t.status && t.status.toLowerCase() === 'open').length;
-  const onHoldCount = tickets.filter((t) => t.status && t.status.toLowerCase() === 'on hold').length;
-  const unassignedCount = tickets.filter((t) => !t.agent).length;
-  const watchingCount = 0; // watching logic
-  const priorityBuckets = ['High', 'Medium', 'Low', 'Urgent'];
-  const priorityCounts = priorityBuckets.map((p) => tickets.filter((t) => t.priority === p && t.status !== 'resolved' && t.status !== 'closed').length);
-  const statusBuckets = Array.from(new Set(tickets.map((t) => t.status)));
-  const statusCounts = statusBuckets.map((s) => tickets.filter((t) => t.status === s && t.status !== 'resolved' && t.status !== 'closed').length);
-  const sevenDaysAgo = now.subtract(7, 'day');
-  const newOpenCount = tickets.filter((t) => dayjs(t.submitted_at).isAfter(sevenDaysAgo) && t.status === 'open').length;
-  const myOpenCount = 0; // agent specific logic
-  const priorityColors = ['#EF4444', '#F59E0B', '#10B981', '#B91C1C'];
-  const statusColors = statusBuckets.map(() => `#${Math.floor(Math.random()*16777215).toString(16)}`);
+  const unresolvedTickets = tickets.filter(t => t.status && !['resolved', 'closed'].includes(t.status.toLowerCase()));
+  
+  const overdueCount = unresolvedTickets.filter(t => t.due_date && dayjs(t.due_date).isBefore(now, 'day')).length;
+  const dueTodayCount = unresolvedTickets.filter(t => t.due_date && dayjs(t.due_date).isSame(now, 'day')).length;
+  const openCount = unresolvedTickets.filter(t => t.status && t.status.toLowerCase() === 'open').length;
+  const onHoldCount = unresolvedTickets.filter(t => t.status && t.status.toLowerCase() === 'on hold').length;
+  const unassignedCount = tickets.filter(t => !t.agent).length;
+  const watchingCount = 0;
 
+  // Priority Chart Data
+  const priorityBuckets = ['Low', 'Medium', 'High', 'Urgent'];
+  const priorityCounts = priorityBuckets.map(p => unresolvedTickets.filter(t => t.priority === p).length);
+  const priorityColors = ['#3b82f6', '#f59e0b', '#ef4444', '#b91c1c']; // Blue, Amber, Red, Dark Red
+
+  // Status Chart Data
+  const statusBuckets = Array.from(new Set(unresolvedTickets.map(t => t.status)));
+  const statusCounts = statusBuckets.map(s => unresolvedTickets.filter(t => t.status === s).length);
+  const statusColors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7']; // Blue, Indigo, Purple, Violet
+
+  // New & My Open Tickets Chart Data
+  const myOpenCount = user ? unresolvedTickets.filter(t => t.agent === user.user_id).length : 0;
+  const newTicketsData = [
+      { label: 'Low', value: unresolvedTickets.filter(t => t.priority === 'Low').length, color: 'linear-gradient(to right, #fbcfe8, #f472b6)'}, // Pink
+      { label: 'Medium', value: unresolvedTickets.filter(t => t.priority === 'Medium').length, color: 'linear-gradient(to right, #d8b4fe, #a855f7)'}, // Purple
+      { label: 'High', value: unresolvedTickets.filter(t => t.priority === 'High').length, color: 'linear-gradient(to right, #a5b4fc, #6366f1)'}, // Indigo
+      { label: 'Urgent', value: unresolvedTickets.filter(t => t.priority === 'Urgent').length, color: 'linear-gradient(to right, #93c5fd, #3b82f6)'}, // Blue
+  ];
 
   return (
     <>
@@ -88,10 +94,10 @@ export default function Dashboard() {
             <StatsCard label="Tickets I'm Watching" count={watchingCount} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <ChartCard title="Unresolved Tickets by Priority" type="doughnut" labels={priorityBuckets} data={priorityCounts} colors={priorityColors} />
             <ChartCard title="Unresolved Tickets by Status" type="doughnut" labels={statusBuckets} data={statusCounts} colors={statusColors} />
-            <ChartCard title="New & My Open Tickets" type="bar" labels={['New (7d)', 'My Open']} data={[newOpenCount, myOpenCount]} colors={['#3b82f6', '#10b981']} />
+            <NewTicketsChart data={newTicketsData} />
           </div>
         </>
       )}
