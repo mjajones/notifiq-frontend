@@ -8,10 +8,11 @@ const inputClass = "w-full bg-foreground p-2 rounded-md border border-border foc
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
 
 export default function TicketForm() {
+    // UPDATED: State keys now match the backend model names
     const [formData, setFormData] = useState({
-        requester: '', subject: '', source: 'portal', status: 'Open',
+        requester_name: '', title: '', source: 'portal', status: 'Open',
         urgency: 'Low', impact: 'Low', priority: 'Low', group: 'Level 1 Helpdesk',
-        agent: '', department: 'IT', category: '', subCategory: '',
+        agent: '', department: 'IT', category: '', subcategory: '',
         description: '', tags: [],
     });
     const [tagInput, setTagInput] = useState('');
@@ -38,7 +39,11 @@ export default function TicketForm() {
     const groupOptions = ['Level 1 Helpdesk', 'Level 2 Helpdesk', 'Level 3 Helpdesk', 'Change Team', 'Database Team', 'Helpdesk Monitoring Team', 'Incident Team', 'Service Design Team', 'Software Team'];
     const departmentOptions = ['IT', 'HR', 'Sales', 'Operations', 'Marketing'];
     const categoryOptions = ['Hardware', 'Software', 'Network', 'Office Applications'];
-    const subCategoryMap = { /* ... */ };
+    const subCategoryMap = {
+        'Hardware': ['Laptop', 'Desktop', 'Printer'],
+        'Software': ['OS Install', 'Application Error'],
+        'Network': ['VPN Access', 'Wi-Fi Issue'],
+    };
 
 
     useEffect(() => {
@@ -98,20 +103,15 @@ export default function TicketForm() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
-
-        // --- FIX IS HERE ---
-        // Create a new FormData object to send
+        
         const data = new FormData();
-
-        // Find the selected agent object from the list of agents
         const selectedAgent = agents.find(
             a => (`${a.first_name} ${a.last_name}`.trim() === formData.agent.trim() || a.username === formData.agent.trim())
         );
 
-        // Loop through the form state and append to our FormData object
+        // Append all form data directly
         for (const key in formData) {
             if (key === 'agent') {
-                // If we found a selected agent, append their ID. Otherwise, append an empty string.
                 data.append('agent', selectedAgent ? selectedAgent.id : '');
             } else if (key === 'tags') {
                 data.append(key, JSON.stringify(formData[key]));
@@ -120,9 +120,7 @@ export default function TicketForm() {
             }
         }
         
-        // Append any files
         files.forEach(file => { data.append('attachments', file); });
-        // --- END OF FIX ---
 
         try {
             const resp = await fetch(`${API_URL}/api/incidents/`, {
@@ -134,7 +132,12 @@ export default function TicketForm() {
             });
             if (resp.ok) {
                 setMessage({ type: 'success', text: 'Ticket created successfully!' });
-                setFormData({ requester: '', subject: '', source: 'portal', status: 'Open', urgency: 'Low', impact: 'Low', priority: 'Low', group: 'Level 1 Helpdesk', agent: '', department: 'IT', category: '', subCategory: '', description: '', tags: [] });
+                setFormData({
+                    requester_name: '', title: '', source: 'portal', status: 'Open',
+                    urgency: 'Low', impact: 'Low', priority: 'Low', group: 'Level 1 Helpdesk',
+                    agent: '', department: 'IT', category: '', subcategory: '',
+                    description: '', tags: [],
+                });
                 setFiles([]);
                 setTagInput('');
             } else {
@@ -158,12 +161,12 @@ export default function TicketForm() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label htmlFor="requester" className={labelClass}>Requester</label>
-                        <input id="requester" name="requester" type="text" value={formData.requester} onChange={handleChange} className={inputClass} placeholder="Search for an employee by name..." list="agents-list" required />
+                        <label htmlFor="requester_name" className={labelClass}>Requester</label>
+                        <input id="requester_name" name="requester_name" type="text" value={formData.requester_name} onChange={handleChange} className={inputClass} placeholder="Search for an employee by name..." list="agents-list" required />
                     </div>
                     <div>
-                        <label htmlFor="subject" className={labelClass}>Subject</label>
-                        <input id="subject" name="subject" type="text" value={formData.subject} onChange={handleChange} className={inputClass} placeholder="A brief summary of the issue" required />
+                        <label htmlFor="title" className={labelClass}>Subject</label>
+                        <input id="title" name="title" type="text" value={formData.title} onChange={handleChange} className={inputClass} placeholder="A brief summary of the issue" required />
                     </div>
                 </div>
 
@@ -187,27 +190,18 @@ export default function TicketForm() {
                     <div><label htmlFor="agent" className={labelClass}>IT Support Agent</label><input id="agent" name="agent" type="text" value={formData.agent} onChange={handleChange} className={inputClass} placeholder="Search or select an agent..." list="agents-list" /></div>
                 </div>
                 
-                {/* Department */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label htmlFor="department" className={labelClass}>Department</label>
-                        <select
-                            id="department"
-                            name="department"
-                            value={formData.department}
-                            onChange={handleChange}
-                            className={inputClass}
-                        >
-                            {departmentOptions.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
+                        <select id="department" name="department" value={formData.department} onChange={handleChange} className={inputClass}>
+                            {departmentOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
                         </select>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div><label htmlFor="category" className={labelClass}>Category</label><select id="category" name="category" value={formData.category} onChange={handleChange} className={inputClass}><option value="">Select Category</option>{categoryOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                    {formData.category && subCategoryMap[formData.category] && (<div><label htmlFor="subCategory" className={labelClass}>Sub-Category</label><select id="subCategory" name="subCategory" value={formData.subCategory} onChange={handleChange} className={inputClass}><option value="">Select Sub-Category</option>{subCategoryMap[formData.category].map((opt) => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
+                    {formData.category && subCategoryMap[formData.category] && (<div><label htmlFor="subcategory" className={labelClass}>Sub-Category</label><select id="subcategory" name="subcategory" value={formData.subcategory} onChange={handleChange} className={inputClass}><option value="">Select Sub-Category</option>{subCategoryMap[formData.category].map((opt) => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
                 </div>
                 <div><label htmlFor="description" className={labelClass}>Description</label><textarea id="description" name="description" value={formData.description} onChange={handleChange} rows="5" className={inputClass + ' resize-y'} placeholder="Provide a detailed description of the issue..." required /></div>
                 <div><label htmlFor="tags" className={labelClass}>Tags</label><div className="flex flex-wrap items-center gap-2 p-2 bg-foreground border border-border rounded-md">{formData.tags.map(tag => (<span key={tag} className="flex items-center bg-primary/10 text-primary text-sm font-medium px-2 py-1 rounded-full">{tag}<button type="button" onClick={() => removeTag(tag)} className="ml-1.5 text-primary/70 hover:text-primary"><FiX size={14} /></button></span>))}<input id="tags" name="tags" type="text" value={tagInput} onChange={handleTagInputChange} onKeyDown={handleTagKeyDown} className="flex-grow bg-transparent focus:outline-none text-text-primary" placeholder={formData.tags.length === 0 ? "Add tags (e.g., vpn, outlook)..." : ""} /></div></div>
