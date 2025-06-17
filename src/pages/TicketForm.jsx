@@ -98,15 +98,31 @@ export default function TicketForm() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
+
+        // --- FIX IS HERE ---
+        // Create a new FormData object to send
         const data = new FormData();
-        Object.keys(formData).forEach(key => {
-            if (key === 'tags') {
+
+        // Find the selected agent object from the list of agents
+        const selectedAgent = agents.find(
+            a => (`${a.first_name} ${a.last_name}`.trim() === formData.agent.trim() || a.username === formData.agent.trim())
+        );
+
+        // Loop through the form state and append to our FormData object
+        for (const key in formData) {
+            if (key === 'agent') {
+                // If we found a selected agent, append their ID. Otherwise, append an empty string.
+                data.append('agent', selectedAgent ? selectedAgent.id : '');
+            } else if (key === 'tags') {
                 data.append(key, JSON.stringify(formData[key]));
             } else {
                 data.append(key, formData[key]);
             }
-        });
+        }
+        
+        // Append any files
         files.forEach(file => { data.append('attachments', file); });
+        // --- END OF FIX ---
 
         try {
             const resp = await fetch(`${API_URL}/api/incidents/`, {
