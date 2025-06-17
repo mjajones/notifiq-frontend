@@ -24,22 +24,24 @@ export default function ChartCard({
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart) return;
+    if (!chart || !chart.ctx || !chart.chartArea) {
+        // If chart is not ready, do nothing. It will re-run.
+        return;
+    }
 
-    // For doughnut charts, create gradients. 
     if (type === 'doughnut') {
         const newBackgrounds = colors.map(color => {
             const ctx = chart.ctx;
             const gradient = ctx.createLinearGradient(0, chart.chartArea.bottom, 0, chart.chartArea.top);
-            gradient.addColorStop(0, color.light || color); 
-            gradient.addColorStop(1, color.dark || color);  
+            gradient.addColorStop(0, color.light || color);
+            gradient.addColorStop(1, color.dark || color);
             return gradient;
         });
         setBackgroundColors(newBackgrounds);
     } else {
-        setBackgroundColors(colors);
+        setBackgroundColors(colors.map(c => c.dark || c)); // Use solid colors for bar charts
     }
-  }, [colors, type, data]); 
+  }, [colors, type, data]); // Rerun effect if these change
 
   const hasData = Array.isArray(data) && data.length > 0 && data.some((v) => v > 0);
   const totalTickets = data.reduce((sum, value) => sum + value, 0);

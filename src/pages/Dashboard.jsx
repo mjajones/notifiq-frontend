@@ -53,7 +53,7 @@ export default function Dashboard() {
   const unassignedCount = tickets.filter(t => !t.agent).length;
   const watchingCount = 0;
 
-  // UPDATED: Priority Colors now defined as gradient pairs
+  // Priority Chart Data
   const priorityBuckets = ['Low', 'Medium', 'High', 'Urgent'];
   const priorityCounts = priorityBuckets.map(p => unresolvedTickets.filter(t => t.priority === p).length);
   const priorityColors = [
@@ -63,22 +63,23 @@ export default function Dashboard() {
       { light: '#f87171', dark: '#b91c1c' }  // Darker Red
   ];
 
-  // UPDATED: Status Colors now defined as gradient pairs
+  // Status Chart Data
   const statusBuckets = Array.from(new Set(unresolvedTickets.map(t => t.status)));
   const statusCounts = statusBuckets.map(s => unresolvedTickets.filter(t => t.status === s).length);
   const statusColors = [
       { light: '#a5b4fc', dark: '#6366f1' }, // Indigo
       { light: '#93c5fd', dark: '#3b82f6' }, // Blue
-      { light: 'c4b5fd', dark: '#8b5cf6' }, // Purple
+      { light: '#c4b5fd', dark: '#8b5cf6' }, // Purple
       { light: '#f9a8d4', dark: '#ec4899' }, // Pink
-  ];
+  ].slice(0, statusBuckets.length);
 
+  const sevenDaysAgo = now.subtract(7, 'day');
+  const newTicketsCount = tickets.filter(t => dayjs(t.submitted_at).isAfter(sevenDaysAgo)).length;
   const myOpenCount = user ? unresolvedTickets.filter(t => t.agent === user.user_id).length : 0;
-  const newTicketsData = [
-      { label: 'Low', value: unresolvedTickets.filter(t => t.priority === 'Low').length, color: 'linear-gradient(to right, #fbcfe8, #f472b6)'},
-      { label: 'Medium', value: unresolvedTickets.filter(t => t.priority === 'Medium').length, color: 'linear-gradient(to right, #d8b4fe, #a855f7)'},
-      { label: 'High', value: unresolvedTickets.filter(t => t.priority === 'High').length, color: 'linear-gradient(to right, #a5b4fc, #6366f1)'},
-      { label: 'Urgent', value: unresolvedTickets.filter(t => t.priority === 'Urgent').length, color: 'linear-gradient(to right, #93c5fd, #3b82f6)'},
+
+  const newAndMyOpenData = [
+      { label: 'New (last 7d)', value: newTicketsCount, color: 'linear-gradient(to right, #a5b4fc, #6366f1)'},
+      { label: 'My Open Tickets', value: myOpenCount, color: 'linear-gradient(to right, #93c5fd, #3b82f6)'},
   ];
 
   return (
@@ -105,7 +106,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <ChartCard title="Unresolved Tickets by Priority" type="doughnut" labels={priorityBuckets} data={priorityCounts} colors={priorityColors} />
             <ChartCard title="Unresolved Tickets by Status" type="doughnut" labels={statusBuckets} data={statusCounts} colors={statusColors} />
-            <NewTicketsChart data={newTicketsData} />
+            <NewTicketsChart title="New & My Open Tickets" data={newAndMyOpenData} />
           </div>
         </>
       )}
