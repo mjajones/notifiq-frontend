@@ -4,7 +4,6 @@ import { FaPlus, FaUserPlus } from 'react-icons/fa';
 import AuthContext from '../context/AuthContext.jsx';
 import StatusSelector from '../components/ui/StatusSelector.jsx';
 
-// --- Configuration for Dropdowns ---
 const statusOptions = [
     { value: 'New', label: 'New', colorClass: 'bg-gray-400' },
     { value: 'Open', label: 'Open', colorClass: 'bg-blue-400' },
@@ -34,17 +33,13 @@ export default function CurrentTickets() {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     const fetchTickets = useCallback(async () => {
-        if (!authTokens) {
-            setLoading(false);
-            return;
-        }
+        if (!authTokens) return;
         try {
             const response = await fetch(`${API_URL}/api/incidents/`, {
                 headers: { 'Authorization': `Bearer ${authTokens.access}` }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            console.log("Fetched ticket data from server:", data); // DEBUG LOG
             setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
         } catch (err) {
             setError(err.message);
@@ -53,57 +48,40 @@ export default function CurrentTickets() {
     
     useEffect(() => {
         if (isUpdating) return;
-
+        setLoading(true);
         const initialLoad = async () => {
-            setLoading(true);
             await fetchTickets();
-            
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, {
                     headers: { 'Authorization': `Bearer ${authTokens.access}` }
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 const usersData = await usersResponse.json();
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : []);
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
             } finally {
                 setLoading(false);
             }
         };
-
         initialLoad();
     }, [fetchTickets, authTokens, isUpdating]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
-        console.log(`Attempting to update ticket ${ticketId} with ${field}: ${value}`); // DEBUG LOG
         setIsUpdating(true);
         setAssigningTicketId(null);
-
         try {
             const formData = new FormData();
             formData.append(field, value);
-            
             if (field === 'agent' && value) {
                 formData.append('status', 'Open');
             }
-
-            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+            await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${authTokens.access}`
-                },
+                headers: { 'Authorization': `Bearer ${authTokens.access}` },
                 body: formData,
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Server update failed: ${response.status} ${errorText}`);
-            }
-            
-            console.log("Update successful, re-fetching tickets..."); // DEBUG LOG
             await fetchTickets();
-
         } catch (err) {
             console.error('Failed to update ticket:', err);
         } finally {
@@ -112,35 +90,24 @@ export default function CurrentTickets() {
     };
 
     const allTicketGroups = useMemo(() => {
-        const groups = {
-            'Unassigned Tickets': [],
-            'Open Tickets': [],
-            'Waiting for Response': [],
-            'Resolved Tickets': [],
-        };
-        
+        const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
         tickets.forEach(ticket => {
             const status = (ticket.status || 'New').toLowerCase();
-            if (!ticket.agent) {
-                groups['Unassigned Tickets'].push(ticket);
-            } else if (['open', 'new', 'in progress', 'new reply'].includes(status)) {
-                groups['Open Tickets'].push(ticket);
-            } else if (status === 'awaiting customer') {
-                groups['Waiting for Response'].push(ticket);
-            } else if (status === 'resolved') {
-                groups['Resolved Tickets'].push(ticket);
-            }
+            if (!ticket.agent) groups['Unassigned Tickets'].push(ticket);
+            else if (['open', 'new', 'in progress', 'new reply'].includes(status)) groups['Open Tickets'].push(ticket);
+            else if (status === 'awaiting customer') groups['Waiting for Response'].push(ticket);
+            else if (status === 'resolved') groups['Resolved Tickets'].push(ticket);
         });
         return groups;
     }, [tickets]);
     
     const isITStaff = user?.groups?.includes('IT Staff');
 
-    if (loading) return <p className="p-8 text-text-secondary">Loading tickets...</p>;
-    if (error) return <p className="p-8 text-red-500">Error: {error}</p>;
+    if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
+    if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
 
     return (
-        <div className="flex-1 p-6 md:p-8 space-y-8">
+        <div className="space-y-8">
             <header>
                 <h1 className="text-3xl font-bold text-text-primary">
                     {isITStaff ? 'All Tickets' : 'My Tickets'}
@@ -152,11 +119,11 @@ export default function CurrentTickets() {
                     <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
                         groupName === 'Unassigned Tickets' ? 'text-red-600' : 
                         groupName === 'Open Tickets' ? 'text-blue-600' :
-                        groupName === 'Waiting for Response' ? 'text-purple-600' :
-                        'text-green-600'
+                        groupName === 'Waiting for Response' ? 'text-purple-600' : 'text-green-600'
                     }`}>{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
-                        <div className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
+                        {/* Desktop Header */}
+                        <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
                             <div className="p-2 pl-4 w-12"></div>
                             <div className="p-2 border-l border-border">Ticket</div>
                             <div className="p-2 border-l border-border text-center">Agent</div>
@@ -164,55 +131,46 @@ export default function CurrentTickets() {
                             <div className="p-2 border-l border-border">Priority</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
-                        {groupTickets.map(ticket => {
-                            const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
-                            return (
-                                <div key={ticket.id} className="grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] items-center border-t border-border hover:bg-gray-50/50">
-                                    <div className="p-2 pl-4 text-center">
-                                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
-                                    </div>
-                                    <div className="p-2 border-l border-border font-medium text-text-primary">
-                                        <Link to={`/tickets/${ticket.id}`} className="hover:underline">
-                                            {ticket.title}
-                                        </Link>
-                                    </div>
-                                    <div className="p-2 border-l border-border flex items-center justify-center relative">
-                                        <button 
-                                          onClick={() => setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id)}
-                                          className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors"
-                                          title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}
-                                        >
-                                          {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}
-                                        </button>
-                                        {assigningTicketId === ticket.id && (
-                                            <div className="absolute top-full mt-2 w-48 bg-white border border-border rounded-md shadow-lg z-20">
-                                                <ul>
-                                                    {itStaff.map(staff => (
-                                                        <li 
-                                                          key={staff.id} 
-                                                          onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)}
-                                                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                        >
-                                                            {`${staff.first_name} ${staff.last_name}`.trim() || staff.username}
-                                                        </li>
-                                                    ))}
-                                                </ul>
+
+                        {/* Ticket List */}
+                        <div>
+                            {groupTickets.map(ticket => {
+                                const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
+                                return (
+                                    <div key={ticket.id} className="border-t border-border">
+                                        {/* Desktop View */}
+                                        <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] items-center hover:bg-gray-50/50">
+                                            <div className="p-2 pl-4 text-center"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
+                                            <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
+                                            <div className="p-2 border-l border-border flex items-center justify-center relative">
+                                                <button onClick={() => setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id)} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
+                                                  {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}
+                                                </button>
+                                                {assigningTicketId === ticket.id && (
+                                                    <div className="absolute top-full mt-2 w-48 bg-white border border-border rounded-md shadow-lg z-20">
+                                                        <ul>{itStaff.map(staff => (<li key={staff.id} onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{`${staff.first_name} ${staff.last_name}`.trim() || staff.username}</li>))}</ul>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+                                            <div className="p-2 border-l border-border"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
+                                            <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                            <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
+                                        </div>
+                                        
+                                        {/* Mobile Card View */}
+                                        <div className="md:hidden p-4 space-y-2">
+                                            <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
+                                            <div className="text-xs text-text-secondary">Created: {new Date(ticket.submitted_at).toLocaleDateString()}</div>
+                                            <div className="flex flex-wrap gap-4 items-center pt-2">
+                                                <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
+                                                <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="p-2 border-l border-border">
-                                        <StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} />
-                                    </div>
-                                    <div className="p-2 border-l border-border">
-                                        <StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} />
-                                    </div>
-                                    <div className="p-2 border-l border-border text-text-secondary">
-                                        {new Date(ticket.submitted_at).toLocaleDateString()}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                         <div className="border-t border-border p-2 pl-12">
+                                );
+                            })}
+                        </div>
+                         <div className="border-t border-border p-2 pl-4 md:pl-12">
                             <Link to="/tickets/create" className="flex items-center gap-2 text-text-secondary hover:text-primary text-sm">
                                 <FaPlus size={12} /> Add Ticket
                             </Link>
