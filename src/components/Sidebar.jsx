@@ -13,6 +13,7 @@ export default function Sidebar() {
 
   const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
+  // Variable is correctly defined here with a capital 'C'
   const baseLinkClass = 'flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors text-text-on-sidebar/70 hover:bg-sidebar-hover hover:text-text-on-sidebar';
   const activeLinkClass = 'bg-primary text-white';
 
@@ -26,20 +27,21 @@ export default function Sidebar() {
         {/* Links - IT staff */}
         {isITStaff && (
           <>
-            <NavLink to="/dashboard" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
+            {/* TYPO FIXED: baseLinkClass now has a capital 'C' */}
+            <NavLink to="/dashboard" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
               <FaHome className="mr-3" /> Dashboard
             </NavLink>
-            <NavLink to="/assets/create" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
+            <NavLink to="/assets/create" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
               <FaBox className="mr-3" /> Assets
             </NavLink>
           </>
         )}
 
         {/* Links - logged in users */}
-        <NavLink to="/tickets" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
+        <NavLink to="/tickets" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
           <FaTicketAlt className="mr-3" /> My Tickets
         </NavLink>
-        <NavLink to="/tickets/create" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
+        <NavLink to="/tickets/create" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
           <FaPlus className="mr-3" /> Create Ticket
         </NavLink>
       </nav>
