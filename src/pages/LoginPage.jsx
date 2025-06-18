@@ -6,7 +6,7 @@ const inputClass = "w-full bg-foreground p-3 rounded-md border border-border foc
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
 
 export default function LoginPage() {
-    const [username, setUsername] = useState('');
+    const [username, setUsername] = useState(''); // This state will now hold the email
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const { loginUser } = useContext(AuthContext);
@@ -19,7 +19,7 @@ export default function LoginPage() {
         if (success) {
             navigate('/dashboard');
         } else {
-            setError('Failed to log in. Please check your username and password.');
+            setError('Failed to log in. Please check your email and password.');
         }
     };
 
@@ -30,10 +30,10 @@ export default function LoginPage() {
                 <p className="text-center text-text-secondary">Sign in to your NotifiQ account</p>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label htmlFor="username" className={labelClass}>Username</label>
+                        <label htmlFor="email" className={labelClass}>Email Address</label>
                         <input
-                            id="username"
-                            type="text"
+                            id="email"
+                            type="email" 
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             className={inputClass}
@@ -53,6 +53,13 @@ export default function LoginPage() {
                     </div>
 
                     {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                    
+                    {/* Forgot PW link */}
+                    <div className="text-sm text-right">
+                        <Link to="/forgot-password" className="font-medium text-primary hover:underline">
+                            Forgot Password?
+                        </Link>
+                    </div>
 
                     <button
                         type="submit"

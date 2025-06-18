@@ -6,7 +6,6 @@ const inputClass = "w-full bg-foreground p-3 rounded-md border border-border foc
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
 
 export default function RegisterPage() {
-    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [password2, setPassword2] = useState('');
@@ -26,12 +25,11 @@ export default function RegisterPage() {
             const response = await fetch(`${API_URL}/api/register/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password })
+                body: JSON.stringify({ email, password })
             });
 
             if (response.ok) {
-                // Redirect to login page
-                navigate('/login', { state: { message: 'Registration successful! Please log in.' } });
+                navigate('/login', { state: { message: 'Registration successful! Please check your email to verify your account.' } });
             } else {
                 const data = await response.json();
                 const errorMessage = Object.values(data).flat().join(' ');
@@ -47,10 +45,6 @@ export default function RegisterPage() {
             <div className="w-full max-w-md p-8 space-y-6 bg-foreground rounded-lg shadow-md border border-border">
                 <h1 className="text-3xl font-bold text-center text-text-primary">Create an Account</h1>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label htmlFor="username" className={labelClass}>Username</label>
-                        <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={inputClass} required />
-                    </div>
                     <div>
                         <label htmlFor="email" className={labelClass}>Email</label>
                         <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
