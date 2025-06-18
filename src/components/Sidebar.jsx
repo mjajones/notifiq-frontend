@@ -11,8 +11,7 @@ export default function Sidebar() {
     logoutUser();
   };
 
-  // Check if user is IT staff
-  const isITStaff = user?.groups?.includes('IT Staff');
+  const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
   const baseLinkClass = 'flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors text-text-on-sidebar/70 hover:bg-sidebar-hover hover:text-text-on-sidebar';
   const activeLinkClass = 'bg-primary text-white';
@@ -27,20 +26,20 @@ export default function Sidebar() {
         {/* Links - IT staff */}
         {isITStaff && (
           <>
-            <NavLink to="/dashboard" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
+            <NavLink to="/dashboard" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
               <FaHome className="mr-3" /> Dashboard
             </NavLink>
-            <NavLink to="/assets/create" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
+            <NavLink to="/assets/create" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
               <FaBox className="mr-3" /> Assets
             </NavLink>
           </>
         )}
 
         {/* Links - logged in users */}
-        <NavLink to="/tickets" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
+        <NavLink to="/tickets" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
           <FaTicketAlt className="mr-3" /> My Tickets
         </NavLink>
-        <NavLink to="/tickets/create" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
+        <NavLink to="/tickets/create" className={({ isActive }) => `${baseLinkclass} ${isActive ? activeLinkClass : ''}`}>
           <FaPlus className="mr-3" /> Create Ticket
         </NavLink>
       </nav>
