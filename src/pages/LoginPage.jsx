@@ -28,7 +28,7 @@ export default function LoginPage() {
             <div className="w-full max-w-md p-8 space-y-6 bg-foreground rounded-lg shadow-md border border-border">
                 
                 <div className="flex justify-center">
-                    <img src="/notifiqlogo.png" alt="NotifiQ Desk Logo" className="w-auto h-12" />
+                    <img src="/notifiqlogo.png" alt="NotifiQ Desk Logo" className="w-auto h-16" />
                 </div>
 
                 <div className="text-center">
