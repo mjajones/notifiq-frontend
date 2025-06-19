@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import PrivateRoute from './utils/PrivateRoute';
 import TicketDetail from './pages/TicketDetail'; 
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email/:uidb64/:token" element={<VerifyEmailPage />} />
-
+      <Route path="/registration-success" element={<RegistrationSuccessPage />} />
       {/* Private routes for main app */}
       <Route element={<PrivateRoute />}>
         <Route path="/" element={<Layout />}>

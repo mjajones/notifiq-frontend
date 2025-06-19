@@ -36,7 +36,8 @@ export default function RegisterPage() {
             });
 
             if (response.ok) {
-                navigate('/login', { state: { message: 'Registration successful! Please check your email to verify your account.' } });
+                // UPDATED: Navigate to the new success page and pass the email in the state
+                navigate('/registration-success', { state: { email: email } });
             } else {
                 const data = await response.json();
                 const errorMessage = Object.values(data).flat().join(' ');
