@@ -6,7 +6,7 @@ const inputClass = "w-full bg-foreground p-3 rounded-md border border-border foc
 const labelClass = "block mb-1.5 text-sm font-medium text-text-secondary";
 
 export default function LoginPage() {
-    const [username, setUsername] = useState(''); // This state will now hold the email
+    const [username, setUsername] = useState(''); // This state will hold the email
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const { loginUser } = useContext(AuthContext);
@@ -26,8 +26,16 @@ export default function LoginPage() {
     return (
         <div className="flex items-center justify-center min-h-screen bg-background">
             <div className="w-full max-w-md p-8 space-y-6 bg-foreground rounded-lg shadow-md border border-border">
-                <h1 className="text-3xl font-bold text-center text-text-primary">Welcome Back!</h1>
-                <p className="text-center text-text-secondary">Sign in to your NotifiQ account</p>
+                
+                <div className="flex justify-center">
+                    <img src="/notifiqlogo.png" alt="NotifiQ Desk Logo" className="w-auto h-12" />
+                </div>
+
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-text-primary">Welcome Back!</h2>
+                    <p className="text-text-secondary mt-1">Sign in to your NotifiQ account</p>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
                         <label htmlFor="email" className={labelClass}>Email Address</label>
@@ -54,7 +62,6 @@ export default function LoginPage() {
 
                     {error && <p className="text-sm text-red-500 text-center">{error}</p>}
                     
-                    {/* Forgot PW link */}
                     <div className="text-sm text-right">
                         <Link to="/forgot-password" className="font-medium text-primary hover:underline">
                             Forgot Password?

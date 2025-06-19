@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom'; // Make sure Link is imported
 import { FaHome, FaTicketAlt, FaPlus, FaBox, FaSignOutAlt } from 'react-icons/fa';
 import AuthContext from '../context/AuthContext.jsx';
 
@@ -7,7 +7,6 @@ export default function Sidebar({ open, setOpen }) {
   const { user, logoutUser } = useContext(AuthContext);
   const sidebarRef = useRef(null);
 
-  // Close sidebar when clicking outside of it on mobile
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
@@ -33,12 +32,18 @@ export default function Sidebar({ open, setOpen }) {
 
   return (
     <>
-      {/* Overlay for mobile */}
       {open && <div className="md:hidden fixed inset-0 bg-black/50 z-20" onClick={() => setOpen(false)}></div>}
 
       <aside ref={sidebarRef} className={sidebarClasses}>
-        <div className="px-6 py-4 text-2xl font-bold border-b border-sidebar-hover text-white">
-          NotifiQ
+        {/* UPDATED: Replaced text with your clickable logo */}
+        <div className="px-6 py-4 flex items-center justify-center border-b border-sidebar-hover">
+          <Link to="/dashboard">
+            <img 
+              src="/notifiqlogo.png" 
+              alt="NotifiQ Desk Logo" 
+              className="h-10 w-auto" 
+            />
+          </Link>
         </div>
         <nav className="flex-1 px-4 py-4 space-y-1">
           {isITStaff && (
