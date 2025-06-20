@@ -55,16 +55,22 @@ export default function CurrentTickets() {
         const initialLoad = async () => {
             await fetchTickets();
             try {
+                // Fetch ONLY IT Staff for the agent dropdown
                 const itStaffResponse = await fetch(`${API_URL}/api/users/?group=IT%20Staff`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
                 if (itStaffResponse.ok) {
                     const itStaffData = await itStaffResponse.json();
-                    setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : []);
+                    // --- DEBUG LINE 1 ---
+                    console.log("Data received for IT Staff:", itStaffData);
+                    setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : (Array.isArray(itStaffData) ? itStaffData : []));
                 }
 
+                // Fetch ALL users for the employee field search list
                 const allUsersResponse = await fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
                 if (allUsersResponse.ok) {
                     const allUsersData = await allUsersResponse.json();
-                    setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : []);
+                    // --- DEBUG LINE 2 ---
+                    console.log("Data received for All Employees:", allUsersData);
+                    setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
                 }
 
             } catch (err) { console.error("Failed to fetch users", err); } 
