@@ -33,7 +33,7 @@ export default function CurrentTickets() {
     const [selectedTickets, setSelectedTickets] = useState([]);
     const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    const [agentSearchTerm, setAgentSearchTerm] = useState(""); // State for the search input
+    const [agentSearchTerm, setAgentSearchTerm] = useState("");
     
     const { authTokens, user } = useContext(AuthContext);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -78,10 +78,21 @@ export default function CurrentTickets() {
     };
     
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
-    const handleBulkStatusChange = async (newStatus) => { /* ... */ };
-    const handleExportSelected = () => { /* ... */ };
-    const handleDuplicateSelected = async () => { /* ... */ };
-    const handleDeleteSelected = async () => { /* ... */ };
+    const handleBulkStatusChange = async (newStatus) => {
+        setIsUpdating(true);
+        const updates = selectedTickets.map(id => {
+            const formData = new FormData();
+            formData.append('status', newStatus);
+            return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
+        });
+        await Promise.all(updates);
+        await fetchTickets();
+        setSelectedTickets([]);
+        setIsUpdating(false);
+    };
+    const handleExportSelected = () => { /* ...existing export code... */ };
+    const handleDuplicateSelected = async () => { /* ...existing duplicate code... */ };
+    const handleDeleteSelected = async () => { /* ...existing delete code... */ };
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
@@ -94,8 +105,7 @@ export default function CurrentTickets() {
         });
         return groups;
     }, [tickets]);
-
-    // Filter staff based on the search term
+    
     const filteredStaff = itStaff.filter(staff => {
         const fullName = `${staff.first_name} ${staff.last_name}`.toLowerCase();
         return fullName.includes(agentSearchTerm.toLowerCase()) || staff.username.toLowerCase().includes(agentSearchTerm.toLowerCase());
@@ -118,75 +128,84 @@ export default function CurrentTickets() {
 
             {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${groupName === 'Unassigned Tickets' ? 'text-red-600' : groupName === 'Open Tickets' ? 'text-blue-600' : 'text-purple-600'}`}>{groupName} ({groupTickets.length})</h2>
+                    <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
+                        groupName === 'Unassigned Tickets' ? 'text-red-600' : 
+                        groupName === 'Open Tickets' ? 'text-blue-600' :
+                        groupName === 'Waiting for Response' ? 'text-purple-600' : 'text-green-600'
+                    }`}>{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
-                            {/* ... headers ... */}
+                            <div className="p-2 pl-4 w-12"></div>
+                            <div className="p-2 border-l border-border">Ticket</div>
+                            <div className="p-2 border-l border-border">Employee</div>
+                            <div className="p-2 border-l border-border text-center">Agent</div>
+                            <div className="p-2 border-l border-border">Status</div>
+                            <div className="p-2 border-l border-border">Priority</div>
+                            <div className="p-2 border-l border-border">Category</div>
+                            <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
                         <div>
                             {groupTickets.map(ticket => {
                                 const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                                 return (
                                     <div key={ticket.id} className="border-t border-border">
-                                        {/* --- Desktop View --- */}
                                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center hover:bg-gray-50/50">
-                                            {/* ... checkbox, title, employee inputs ... */}
+                                            <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
+                                            <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
+                                            <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter employee name"/></div>
                                             <div className="p-2 border-l border-border flex items-center justify-center relative">
-                                                <button 
-                                                  onClick={() => {
-                                                      setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id);
-                                                      setAgentSearchTerm(""); // Reset search on open/close
-                                                  }} 
-                                                  className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" 
-                                                  title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}
-                                                >
+                                                <button onClick={() => { setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
                                                   {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}
                                                 </button>
-                                                
-                                                {/* --- NEW: Searchable Dropdown --- */}
                                                 {assigningTicketId === ticket.id && (
                                                     <div className="absolute top-full mt-2 w-64 bg-white border border-border rounded-md shadow-lg z-20 text-left">
-                                                        <div className="p-2 border-b">
-                                                            <div className="relative">
-                                                                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Search names..."
-                                                                    className="w-full bg-gray-100 p-2 pl-9 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                                                                    value={agentSearchTerm}
-                                                                    onChange={(e) => setAgentSearchTerm(e.target.value)}
-                                                                    autoFocus
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <ul className="max-h-48 overflow-y-auto">
-                                                            {filteredStaff.length > 0 ? (
-                                                                filteredStaff.map(staff => (
-                                                                    <li key={staff.id} onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer font-normal">
-                                                                        {`${staff.first_name} ${staff.last_name}`.trim() || staff.username}
-                                                                    </li>
-                                                                ))
-                                                            ) : (
-                                                                <li className="px-3 py-2 text-gray-500 font-normal">No results found.</li>
-                                                            )}
-                                                        </ul>
+                                                        <div className="p-2 border-b"><div className="relative"><FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input type="text" placeholder="Search names..." className="w-full bg-gray-100 p-2 pl-9 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" value={agentSearchTerm} onChange={(e) => setAgentSearchTerm(e.target.value)} autoFocus /></div></div>
+                                                        <ul className="max-h-48 overflow-y-auto">{filteredStaff.length > 0 ? (filteredStaff.map(staff => (<li key={staff.id} onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer font-normal">{`${staff.first_name} ${staff.last_name}`.trim() || staff.username}</li>))) : (<li className="px-3 py-2 text-gray-500 font-normal">No results found.</li>)}</ul>
                                                     </div>
                                                 )}
                                             </div>
-                                            {/* ... rest of the row ... */}
+                                            <div className="p-2 border-l border-border"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
+                                            <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                            <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
+                                            <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                         </div>
-                                        {/* --- Mobile View --- */}
-                                        {/* ... existing mobile card view ... */}
+                                        <div className="md:hidden p-3 flex gap-3"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1" />
+                                            <div className="space-y-2 flex-1">
+                                                <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
+                                                <div className="text-sm"><span className="text-text-secondary">For: </span><span className="font-medium text-text-primary">{ticket.requester_name}</span></div>
+                                                <div className="text-xs text-text-secondary">Category: {ticket.category || 'N/A'} &bull; Created: {new Date(ticket.submitted_at).toLocaleDateString()}</div>
+                                                <div className="flex flex-wrap gap-4 items-center pt-2">
+                                                    <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
+                                                    <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
                         </div>
-                        {/* ... add ticket link ... */}
+                         <div className="border-t border-border p-2 pl-4 md:pl-12">
+                            <Link to="/tickets/create" className="flex items-center gap-2 text-text-secondary hover:text-primary text-sm"><FaPlus size={12} /> Add Ticket</Link>
+                        </div>
                     </div>
                 </div>
             ))}
 
-            {/* ... floating bulk action bar ... */}
+            {selectedTickets.length > 0 && (
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white p-2 rounded-lg shadow-2xl flex items-center gap-4 z-40 text-sm">
+                    <span className="font-bold px-2">{selectedTickets.length} selected</span>
+                    <div className="h-6 w-px bg-gray-600"></div>
+                    <button onClick={handleDuplicateSelected} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md"><FaCopy /> Duplicate</button>
+                    <button onClick={handleExportSelected} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md"><FaFileCsv /> Export CSV</button>
+                    <button onClick={() => setIsConfirmingDelete(true)} className="flex items-center gap-2 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded-md"><FaTrash /> Delete</button>
+                    <div className="relative">
+                        <button onClick={() => setIsMoveMenuOpen(!isMoveMenuOpen)} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md">Move to <FiChevronDown /></button>
+                        {isMoveMenuOpen && ( <div className="absolute bottom-full mb-2 w-48 bg-white text-gray-800 border border-border rounded-md shadow-lg z-50"><ul>{statusOptions.map(opt => (<li key={opt.value} onClick={() => { handleBulkStatusChange(opt.value); setIsMoveMenuOpen(false); }} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{opt.label}</li>))}</ul></div> )}
+                    </div>
+                    <div className="h-6 w-px bg-gray-600"></div>
+                    <button onClick={() => setSelectedTickets([])} className="hover:bg-gray-700 p-2 rounded-full"><FaTimes /></button>
+                </div>
+            )}
         </div>
     );
 }
