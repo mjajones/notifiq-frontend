@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useContext, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { FaPlus, FaUserPlus } from 'react-icons/fa';
+import { FaPlus, FaUserPlus, FaTimes, FaFileCsv, FaTrash, FaCopy } from 'react-icons/fa';
+import { FiChevronDown } from 'react-icons/fi';
 import AuthContext from '../context/AuthContext.jsx';
 import StatusSelector from '../components/ui/StatusSelector.jsx';
 
@@ -28,6 +29,11 @@ export default function CurrentTickets() {
     const [error, setError] = useState(null);
     const [assigningTicketId, setAssigningTicketId] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
+    
+    // NEW: State for selected tickets and move dropdown
+    const [selectedTickets, setSelectedTickets] = useState([]);
+    const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
+    
     const { authTokens, user } = useContext(AuthContext);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -57,8 +63,7 @@ export default function CurrentTickets() {
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 const usersData = await usersResponse.json();
-                // BUG FIX: This now correctly parses the user data
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : []);
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
             } finally {
@@ -74,9 +79,7 @@ export default function CurrentTickets() {
         try {
             const formData = new FormData();
             formData.append(field, value);
-            if (field === 'agent' && value) {
-                formData.append('status', 'Open');
-            }
+            if (field === 'agent' && value) formData.append('status', 'Open');
             await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${authTokens.access}` },
@@ -88,6 +91,21 @@ export default function CurrentTickets() {
         } finally {
             setIsUpdating(false);
         }
+    };
+    
+    // NEW: Handlers for bulk actions
+    const handleSelectTicket = (ticketId) => {
+        setSelectedTickets(prev =>
+            prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]
+        );
+    };
+
+    const handleBulkUpdate = async (field, value) => {
+        setIsUpdating(true);
+        const updates = selectedTickets.map(id => handleTicketUpdate(id, field, value));
+        await Promise.all(updates);
+        setSelectedTickets([]);
+        setIsUpdating(false);
     };
 
     const allTicketGroups = useMemo(() => {
@@ -123,7 +141,6 @@ export default function CurrentTickets() {
                         groupName === 'Waiting for Response' ? 'text-purple-600' : 'text-green-600'
                     }`}>{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
-                        {/* UPDATED: New grid layout with more columns */}
                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
                             <div className="p-2 pl-4 w-12"></div>
                             <div className="p-2 border-l border-border">Ticket</div>
@@ -133,25 +150,18 @@ export default function CurrentTickets() {
                             <div className="p-2 border-l border-border">Category</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
-
                         <div>
                             {groupTickets.map(ticket => {
                                 const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                                 return (
                                     <div key={ticket.id} className="border-t border-border">
-                                        {/* Desktop View */}
                                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1fr_1.5fr] items-center hover:bg-gray-50/50">
-                                            <div className="p-2 pl-4 text-center"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
+                                            <div className="p-2 pl-4 text-center">
+                                                <input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                                            </div>
                                             <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
-                                            {/* NEW: Employee Column */}
                                             <div className="p-2 border-l border-border">
-                                                <input
-                                                    type="text"
-                                                    defaultValue={ticket.requester_name}
-                                                    onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)}
-                                                    className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                                                    placeholder="Enter employee name"
-                                                />
+                                                <input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter employee name"/>
                                             </div>
                                             <div className="p-2 border-l border-border flex items-center justify-center relative">
                                                 <button onClick={() => setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id)} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
@@ -164,24 +174,19 @@ export default function CurrentTickets() {
                                                 )}
                                             </div>
                                             <div className="p-2 border-l border-border"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
-                                            {/* NEW: Category Column */}
                                             <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
                                             <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                         </div>
-                                        
-                                        {/* Mobile Card View */}
-                                        <div className="md:hidden p-4 space-y-3">
-                                            <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
-                                            <div className="text-sm">
-                                                <span className="text-text-secondary">For: </span>
-                                                <span className="font-medium text-text-primary">{ticket.requester_name}</span>
-                                            </div>
-                                            <div className="text-xs text-text-secondary">
-                                                Category: {ticket.category || 'N/A'} &bull; Created: {new Date(ticket.submitted_at).toLocaleDateString()}
-                                            </div>
-                                            <div className="flex flex-wrap gap-4 items-center pt-2">
-                                                <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
-                                                <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                        <div className="md:hidden p-3 flex gap-3">
+                                            <div><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1" /></div>
+                                            <div className="space-y-2 flex-1">
+                                                <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
+                                                <div className="text-sm"><span className="text-text-secondary">For: </span><span className="font-medium text-text-primary">{ticket.requester_name}</span></div>
+                                                <div className="text-xs text-text-secondary">Category: {ticket.category || 'N/A'} &bull; Created: {new Date(ticket.submitted_at).toLocaleDateString()}</div>
+                                                <div className="flex flex-wrap gap-4 items-center pt-2">
+                                                    <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
+                                                    <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -196,6 +201,37 @@ export default function CurrentTickets() {
                     </div>
                 </div>
             ))}
+
+            {/* NEW: Floating Bulk Action Bar */}
+            {selectedTickets.length > 0 && (
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white p-2 rounded-lg shadow-2xl flex items-center gap-4 z-40 text-sm">
+                    <span className="font-bold px-2">{selectedTickets.length} selected</span>
+                    <div className="h-6 w-px bg-gray-600"></div>
+                    <button onClick={() => alert('Duplicate functionality not yet implemented.')} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md"><FaCopy /> Duplicate</button>
+                    <button onClick={() => alert('Export functionality not yet implemented.')} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md"><FaFileCsv /> Export CSV</button>
+                    <button onClick={() => alert('Delete functionality not yet implemented.')} className="flex items-center gap-2 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded-md"><FaTrash /> Delete</button>
+                    
+                    <div className="relative">
+                        <button onClick={() => setIsMoveMenuOpen(!isMoveMenuOpen)} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md">
+                            Move to <FiChevronDown />
+                        </button>
+                        {isMoveMenuOpen && (
+                            <div className="absolute bottom-full mb-2 w-48 bg-white text-gray-800 border border-border rounded-md shadow-lg z-50">
+                                <ul>
+                                    {statusOptions.map(opt => (
+                                        <li key={opt.value} onClick={() => { handleBulkUpdate('status', opt.value); setIsMoveMenuOpen(false); }} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{opt.label}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-600"></div>
+                    <button onClick={() => setSelectedTickets([])} className="hover:bg-gray-700 p-2 rounded-full">
+                        <FaTimes />
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
