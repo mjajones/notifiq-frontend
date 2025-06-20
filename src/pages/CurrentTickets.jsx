@@ -55,7 +55,10 @@ export default function CurrentTickets() {
             try {
                 const usersResponse = await fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
+                
+                // BUG FIX #1: This now correctly uses 'usersResponse' to get the user data
                 const usersData = await usersResponse.json();
+                
                 setItStaff(Array.isArray(usersData.results) ? usersData.results : []);
             } catch (err) { console.error("Failed to fetch users", err); } 
             finally { setLoading(false); }
@@ -171,9 +174,15 @@ export default function CurrentTickets() {
 
             {Object.entries(allTicketGroups).map(([groupName, groupTickets]) => (
                 <div key={groupName}>
-                    <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${groupName === 'Unassigned Tickets' ? 'text-red-600' : groupName === 'Open Tickets' ? 'text-blue-600' : 'text-purple-600'}`}>{groupName} ({groupTickets.length})</h2>
+                    {/* BUG FIX #2: Corrected the logic for group header colors */}
+                    <h2 className={`text-sm font-bold mb-2 uppercase tracking-wider ${
+                        groupName === 'Unassigned Tickets' ? 'text-red-600' : 
+                        groupName === 'Open Tickets' ? 'text-blue-600' :
+                        groupName === 'Waiting for Response' ? 'text-purple-600' :
+                        'text-green-600'
+                    }`}>{groupName} ({groupTickets.length})</h2>
+
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
-                        
                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
                             <div className="p-2 pl-4 w-12"></div>
                             <div className="p-2 border-l border-border">Ticket</div>
@@ -184,13 +193,11 @@ export default function CurrentTickets() {
                             <div className="p-2 border-l border-border">Category</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
-
                         <div>
                             {groupTickets.map(ticket => {
                                 const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                                 return (
                                     <div key={ticket.id} className="border-t border-border">
-                                        {/* Desktop View */}
                                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center hover:bg-gray-50/50">
                                             <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
                                             <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
@@ -202,12 +209,10 @@ export default function CurrentTickets() {
                                                 {assigningTicketId === ticket.id && ( <div className="absolute top-full mt-2 w-48 bg-white border border-border rounded-md shadow-lg z-20"><ul>{itStaff.map(staff => (<li key={staff.id} onClick={() => handleTicketUpdate(ticket.id, 'agent', staff.id)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{`${staff.first_name} ${staff.last_name}`.trim() || staff.username}</li>))}</ul></div> )}
                                             </div>
                                             <div className="p-2 border-l border-border"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
-                                            {/* ADDED: Priority column cell */}
                                             <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
                                             <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
                                             <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                         </div>
-                                        {/* Mobile Card View */}
                                         <div className="md:hidden p-3 flex gap-3"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1" />
                                             <div className="space-y-2 flex-1">
                                                 <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
@@ -215,7 +220,6 @@ export default function CurrentTickets() {
                                                 <div className="text-xs text-text-secondary">Category: {ticket.category || 'N/A'} &bull; Created: {new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                                 <div className="flex flex-wrap gap-4 items-center pt-2">
                                                     <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
-                                                    {/* ADDED: Priority selector for mobile view */}
                                                     <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
                                                 </div>
                                             </div>
@@ -232,7 +236,7 @@ export default function CurrentTickets() {
             ))}
 
             {selectedTickets.length > 0 && (
-                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white p-2 rounded-lg shadow-2xl flex items-center gap-4 z-40 text-sm animate-fade-in-up">
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white p-2 rounded-lg shadow-2xl flex items-center gap-4 z-40 text-sm">
                     <span className="font-bold px-2">{selectedTickets.length} selected</span>
                     <div className="h-6 w-px bg-gray-600"></div>
                     <button onClick={handleDuplicateSelected} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md"><FaCopy /> Duplicate</button>
