@@ -57,7 +57,8 @@ export default function CurrentTickets() {
                 });
                 if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
                 const usersData = await usersResponse.json();
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : []);
+                // BUG FIX: This now correctly parses the user data
+                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
             } catch (err) {
                 console.error("Failed to fetch users for assignment", err);
             } finally {
@@ -101,7 +102,7 @@ export default function CurrentTickets() {
         return groups;
     }, [tickets]);
     
-    const isITStaff = user?.groups?.includes('IT Staff');
+    const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
     if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
@@ -122,26 +123,36 @@ export default function CurrentTickets() {
                         groupName === 'Waiting for Response' ? 'text-purple-600' : 'text-green-600'
                     }`}>{groupName} ({groupTickets.length})</h2>
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
-                        {/* Desktop Header */}
-                        <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] text-xs font-semibold text-text-secondary border-b border-border">
+                        {/* UPDATED: New grid layout with more columns */}
+                        <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
                             <div className="p-2 pl-4 w-12"></div>
                             <div className="p-2 border-l border-border">Ticket</div>
+                            <div className="p-2 border-l border-border">Employee</div>
                             <div className="p-2 border-l border-border text-center">Agent</div>
                             <div className="p-2 border-l border-border">Status</div>
-                            <div className="p-2 border-l border-border">Priority</div>
+                            <div className="p-2 border-l border-border">Category</div>
                             <div className="p-2 border-l border-border">Creation Date</div>
                         </div>
 
-                        {/* Ticket List */}
                         <div>
                             {groupTickets.map(ticket => {
                                 const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                                 return (
                                     <div key={ticket.id} className="border-t border-border">
                                         {/* Desktop View */}
-                                        <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_2fr] items-center hover:bg-gray-50/50">
+                                        <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1fr_1.5fr] items-center hover:bg-gray-50/50">
                                             <div className="p-2 pl-4 text-center"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
                                             <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
+                                            {/* NEW: Employee Column */}
+                                            <div className="p-2 border-l border-border">
+                                                <input
+                                                    type="text"
+                                                    defaultValue={ticket.requester_name}
+                                                    onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)}
+                                                    className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                                                    placeholder="Enter employee name"
+                                                />
+                                            </div>
                                             <div className="p-2 border-l border-border flex items-center justify-center relative">
                                                 <button onClick={() => setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id)} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
                                                   {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}
@@ -153,14 +164,21 @@ export default function CurrentTickets() {
                                                 )}
                                             </div>
                                             <div className="p-2 border-l border-border"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
-                                            <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                            {/* NEW: Category Column */}
+                                            <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
                                             <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                         </div>
                                         
                                         {/* Mobile Card View */}
-                                        <div className="md:hidden p-4 space-y-2">
+                                        <div className="md:hidden p-4 space-y-3">
                                             <Link to={`/tickets/${ticket.id}`} className="font-bold text-text-primary hover:underline">{ticket.title}</Link>
-                                            <div className="text-xs text-text-secondary">Created: {new Date(ticket.submitted_at).toLocaleDateString()}</div>
+                                            <div className="text-sm">
+                                                <span className="text-text-secondary">For: </span>
+                                                <span className="font-medium text-text-primary">{ticket.requester_name}</span>
+                                            </div>
+                                            <div className="text-xs text-text-secondary">
+                                                Category: {ticket.category || 'N/A'} &bull; Created: {new Date(ticket.submitted_at).toLocaleDateString()}
+                                            </div>
                                             <div className="flex flex-wrap gap-4 items-center pt-2">
                                                 <div className="flex-1 min-w-[120px]"><StatusSelector options={statusOptions} value={ticket.status} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status', newValue)} /></div>
                                                 <div className="flex-1 min-w-[120px]"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>

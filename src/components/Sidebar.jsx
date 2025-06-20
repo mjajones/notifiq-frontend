@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef } from 'react';
-import { NavLink, Link } from 'react-router-dom'; // Make sure Link is imported
+import { NavLink, Link } from 'react-router-dom';
 import { FaHome, FaTicketAlt, FaPlus, FaBox, FaSignOutAlt } from 'react-icons/fa';
 import AuthContext from '../context/AuthContext.jsx';
 
@@ -35,13 +35,12 @@ export default function Sidebar({ open, setOpen }) {
       {open && <div className="md:hidden fixed inset-0 bg-black/50 z-20" onClick={() => setOpen(false)}></div>}
 
       <aside ref={sidebarRef} className={sidebarClasses}>
-        {/* UPDATED: Replaced text with your clickable logo */}
         <div className="px-6 py-4 flex items-center justify-center border-b border-sidebar-hover">
           <Link to="/dashboard">
             <img 
               src="/notifiqlogo.png" 
               alt="NotifiQ Desk Logo" 
-              className="h-14 w-auto" 
+              className="h-10 w-auto" 
             />
           </Link>
         </div>
@@ -56,8 +55,9 @@ export default function Sidebar({ open, setOpen }) {
               </NavLink>
             </>
           )}
+          {/* UPDATED: Text is now conditional */}
           <NavLink to="/tickets" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
-            <FaTicketAlt className="mr-3" /> My Tickets
+            <FaTicketAlt className="mr-3" /> {isITStaff ? 'Tickets' : 'My Tickets'}
           </NavLink>
           <NavLink to="/tickets/create" className={({ isActive }) => `${baseLinkClass} ${isActive ? activeLinkClass : ''}`}>
             <FaPlus className="mr-3" /> Create Ticket
