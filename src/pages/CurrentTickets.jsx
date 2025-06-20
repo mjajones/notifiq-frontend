@@ -26,6 +26,7 @@ const priorityOptions = [
 export default function CurrentTickets() {
     const [tickets, setTickets] = useState([]);
     const [itStaff, setItStaff] = useState([]);
+    const [allEmployees, setAllEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [assigningTicketId, setAssigningTicketId] = useState(null);
@@ -54,10 +55,18 @@ export default function CurrentTickets() {
         const initialLoad = async () => {
             await fetchTickets();
             try {
-                const usersResponse = await fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
-                if (!usersResponse.ok) throw new Error(`HTTP ${usersResponse.status} fetching users`);
-                const usersData = await usersResponse.json();
-                setItStaff(Array.isArray(usersData.results) ? usersData.results : (Array.isArray(usersData) ? usersData : []));
+                const itStaffResponse = await fetch(`${API_URL}/api/users/?group=IT%20Staff`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
+                if (itStaffResponse.ok) {
+                    const itStaffData = await itStaffResponse.json();
+                    setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : []);
+                }
+
+                const allUsersResponse = await fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
+                if (allUsersResponse.ok) {
+                    const allUsersData = await allUsersResponse.json();
+                    setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : []);
+                }
+
             } catch (err) { console.error("Failed to fetch users", err); } 
             finally { setLoading(false); }
         };
@@ -78,6 +87,7 @@ export default function CurrentTickets() {
     };
     
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
+
     const handleBulkStatusChange = async (newStatus) => {
         setIsUpdating(true);
         const updates = selectedTickets.map(id => {
@@ -90,9 +100,57 @@ export default function CurrentTickets() {
         setSelectedTickets([]);
         setIsUpdating(false);
     };
-    const handleExportSelected = () => { /* ...existing export code... */ };
-    const handleDuplicateSelected = async () => { /* ...existing duplicate code... */ };
-    const handleDeleteSelected = async () => { /* ...existing delete code... */ };
+
+    const handleExportSelected = () => {
+        const ticketsToExport = tickets.filter(t => selectedTickets.includes(t.id));
+        if (ticketsToExport.length === 0) return;
+        const headers = ['ID', 'Title', 'Status', 'Priority', 'Category', 'Employee', 'Agent'];
+        const rows = ticketsToExport.map(ticket => {
+            const agentName = itStaff.find(staff => staff.id === ticket.agent)?.username || 'Unassigned';
+            const title = `"${ticket.title.replace(/"/g, '""')}"`;
+            return [ticket.id, title, ticket.status, ticket.priority, ticket.category, ticket.requester_name, agentName].join(',');
+        });
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "notifiq_tickets.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setSelectedTickets([]);
+    };
+
+    const handleDuplicateSelected = async () => {
+        setIsUpdating(true);
+        const duplicatePromises = selectedTickets.map(id =>
+            fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
+        );
+        try {
+            await Promise.all(duplicatePromises);
+        } catch (err) { console.error("Failed to duplicate tickets:", err); } 
+        finally {
+            await fetchTickets();
+            setSelectedTickets([]);
+            setIsUpdating(false);
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        setIsConfirmingDelete(false);
+        setIsUpdating(true);
+        const deletePromises = selectedTickets.map(id =>
+            fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
+        );
+        try {
+            await Promise.all(deletePromises);
+        } catch (err) { console.error("Failed to delete tickets:", err); } 
+        finally {
+            await fetchTickets();
+            setSelectedTickets([]);
+            setIsUpdating(false);
+        }
+    };
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
@@ -121,6 +179,11 @@ export default function CurrentTickets() {
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
                 Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
             </ConfirmationDialog>
+            <datalist id="employee-list">
+                {allEmployees.map(employee => (
+                    <option key={employee.id} value={`${employee.first_name} ${employee.last_name}`.trim() || employee.username} />
+                ))}
+            </datalist>
 
             <header>
                 <h1 className="text-3xl font-bold text-text-primary">{isITStaff ? 'All Tickets' : 'My Tickets'}</h1>
@@ -152,7 +215,7 @@ export default function CurrentTickets() {
                                         <div className="hidden md:grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center hover:bg-gray-50/50">
                                             <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
                                             <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
-                                            <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter employee name"/></div>
+                                            <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter or search employee" list="employee-list"/></div>
                                             <div className="p-2 border-l border-border flex items-center justify-center relative">
                                                 <button onClick={() => { setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
                                                   {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}

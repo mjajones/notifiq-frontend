@@ -53,7 +53,7 @@ export default function TicketForm() {
                 return;
             }
             try {
-                const response = await fetch(`${API_URL}/api/users/`, {
+                const response = await fetch(`${API_URL}/api/users/?group=IT%20Staff`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authTokens.access}`
