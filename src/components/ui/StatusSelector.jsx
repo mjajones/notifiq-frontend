@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 
 export default function StatusSelector({ options, value, onChange }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [opensUp, setOpensUp] = useState(false);
     const wrapperRef = useRef(null);
 
+    // This effect closes the dropdown if you click outside of it
     useEffect(() => {
         function handleClickOutside(event) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -14,25 +16,47 @@ export default function StatusSelector({ options, value, onChange }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [wrapperRef]);
     
-    const selectedOption = options.find(opt => opt.value.toLowerCase() === value.toLowerCase()) || options[0];
+    const handleToggle = () => {
+        if (!isOpen && wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            
+            const dropdownHeight = options.length * 40 + 10; 
+
+            if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+                setOpensUp(true);
+            } else {
+                setOpensUp(false);
+            }
+        }
+        setIsOpen(!isOpen);
+    };
+    
+    const selectedOption = options.find(opt => opt.value.toLowerCase() === (value || '').toLowerCase()) || options[0];
 
     const handleSelect = (option) => {
         onChange(option.value);
         setIsOpen(false);
     };
 
+
+    const dropdownMenuClasses = `
+        absolute z-20 w-full bg-foreground border border-border rounded-md shadow-lg
+        ${opensUp ? 'bottom-full mb-1' : 'top-full mt-1'}
+    `;
+
     return (
         <div className="relative w-full" ref={wrapperRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className={`w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md ${selectedOption.colorClass}`}
+                onClick={handleToggle}
+                className={`w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md truncate ${selectedOption.colorClass}`}
             >
                 {selectedOption.label}
             </button>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-foreground border border-border rounded-md shadow-lg">
+                <div className={dropdownMenuClasses}>
                     <ul className="py-1">
                         {options.map((option) => (
                             <li
