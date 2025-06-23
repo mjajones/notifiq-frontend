@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { FiEdit } from 'react-icons/fi';
 
 function DropdownList({ options, onSelect, onClose, targetRect }) {
   const dropdownRef = useRef(null);
@@ -11,8 +12,7 @@ function DropdownList({ options, onSelect, onClose, targetRect }) {
     const { innerHeight } = window;
     const dropdownHeight = dropdownEl.offsetHeight;
     
-    let top = targetRect.bottom + 4; 
-
+    let top = targetRect.bottom + 4;
     if ((top + dropdownHeight) > innerHeight && targetRect.top > dropdownHeight) {
       top = targetRect.top - dropdownHeight - 4;
     }
@@ -36,7 +36,7 @@ function DropdownList({ options, onSelect, onClose, targetRect }) {
   return createPortal(
     <div
       ref={dropdownRef}
-      className="fixed z-50" 
+      className="fixed z-50"
     >
       <ul className="py-1 bg-foreground border border-border rounded-md shadow-lg">
         {options.map((option) => (
@@ -48,9 +48,18 @@ function DropdownList({ options, onSelect, onClose, targetRect }) {
             {option.label}
           </li>
         ))}
+        {/* Edit Labels Button */}
+        <li className="border-t border-border mt-1 pt-1">
+            <button 
+                onClick={() => alert("Building a fully editable label system requires backend changes.")}
+                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-gray-100 flex items-center gap-2"
+            >
+                <FiEdit size={14} /> Edit Labels
+            </button>
+        </li>
       </ul>
     </div>,
-    document.body 
+    document.body
   );
 }
 

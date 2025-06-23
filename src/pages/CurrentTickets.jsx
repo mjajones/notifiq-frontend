@@ -66,7 +66,6 @@ export default function CurrentTickets() {
                     const allUsersData = await allUsersResponse.json();
                     setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
                 }
-
             } catch (err) { console.error("Failed to fetch users", err); } 
             finally { setLoading(false); }
         };
@@ -88,13 +87,20 @@ export default function CurrentTickets() {
     
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
 
-    const handleBulkStatusChange = async (newStatus) => {
+    const handleBulkMove = async (groupName) => {
         setIsUpdating(true);
+        setIsMoveMenuOpen(false);
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
-            formData.append('status', newStatus);
+            switch (groupName) {
+                case 'Unassigned Tickets': formData.append('agent', ''); break;
+                case 'Open Tickets': formData.append('status', 'Open'); break;
+                case 'Waiting for Response': formData.append('status', 'Awaiting customer'); break;
+                case 'Resolved Tickets': formData.append('status', 'Resolved'); break;
+                default: return null;
+            }
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
-        });
+        }).filter(Boolean);
         await Promise.all(updates);
         await fetchTickets();
         setSelectedTickets([]);
@@ -254,7 +260,7 @@ export default function CurrentTickets() {
                     <button onClick={() => setIsConfirmingDelete(true)} className="flex items-center gap-2 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded-md"><FaTrash /> Delete</button>
                     <div className="relative">
                         <button onClick={() => setIsMoveMenuOpen(!isMoveMenuOpen)} className="flex items-center gap-2 hover:bg-gray-700 p-2 rounded-md">Move to <FiChevronDown /></button>
-                        {isMoveMenuOpen && ( <div className="absolute bottom-full mb-2 w-48 bg-white text-gray-800 border border-border rounded-md shadow-lg z-50"><ul>{statusOptions.map(opt => (<li key={opt.value} onClick={() => { handleBulkStatusChange(opt.value); setIsMoveMenuOpen(false); }} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{opt.label}</li>))}</ul></div> )}
+                        {isMoveMenuOpen && ( <div className="absolute bottom-full mb-2 w-48 bg-white text-gray-800 border border-border rounded-md shadow-lg z-50"><ul>{['Unassigned Tickets', 'Open Tickets', 'Waiting for Response', 'Resolved Tickets'].map(opt => (<li key={opt} onClick={() => { handleBulkMove(opt); setIsMoveMenuOpen(false); }} className="px-3 py-2 hover:bg-gray-100 cursor-pointer">{opt}</li>))}</ul></div> )}
                     </div>
                     <div className="h-6 w-px bg-gray-600"></div>
                     <button onClick={() => setSelectedTickets([])} className="hover:bg-gray-700 p-2 rounded-full"><FaTimes /></button>
