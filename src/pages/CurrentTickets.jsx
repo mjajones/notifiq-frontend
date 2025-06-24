@@ -138,19 +138,33 @@ export default function CurrentTickets() {
     const handleBulkMove = async (groupName) => {
         setIsUpdating(true);
         setIsMoveMenuOpen(false);
+        
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
             let statusToApply;
+            let statusNameToFind = '';
+
             switch (groupName) {
                 case 'Unassigned Tickets': formData.append('agent', ''); break;
-                case 'Open Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open'); break;
-                case 'Waiting for Response': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer'); break;
-                case 'Resolved Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved'); break;
+                case 'Open Tickets': statusNameToFind = 'open'; break;
+                case 'Waiting for Response': statusNameToFind = 'awaiting customer'; break;
+                case 'Resolved Tickets': statusNameToFind = 'resolved'; break;
                 default: return null;
             }
-            if (statusToApply) formData.append('status_id', statusToApply.id);
+
+            if (statusNameToFind) {
+                statusToApply = statusLabels.find(l => l.name.toLowerCase() === statusNameToFind);
+                console.log(`For group "${groupName}", found status object:`, statusToApply);
+                if (statusToApply) {
+                    formData.append('status_id', statusToApply.id);
+                } else {
+                    console.error(`Could not find a status label named "${statusNameToFind}"`);
+                }
+            }
+
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
+        
         await Promise.all(updates);
         await fetchTickets();
         setSelectedTickets([]);
