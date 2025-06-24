@@ -7,7 +7,6 @@ import AuthContext from '../context/AuthContext.jsx';
 import StatusSelector from '../components/ui/StatusSelector.jsx';
 import ConfirmationDialog from '../components/ui/ConfirmationDialog.jsx';
 
-// A new, robust dropdown component for the Agent selector
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
 
@@ -92,9 +91,19 @@ export default function CurrentTickets() {
                     fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
                     fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
                 ]);
-                if (itStaffRes.ok) setItStaff((await itStaffRes.json()).results || []);
-                if (allUsersRes.ok) setAllEmployees((await allUsersRes.json()).results || []);
-                if (statusLabelsRes.ok) setStatusLabels(await statusLabelsRes.json());
+
+                if (itStaffRes.ok) {
+                    const itStaffData = await itStaffRes.json();
+                    setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : (Array.isArray(itStaffData) ? itStaffData : []));
+                }
+                if (allUsersRes.ok) {
+                    const allUsersData = await allUsersRes.json();
+                    setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
+                }
+                if (statusLabelsRes.ok) {
+                    const statusLabelsData = await statusLabelsRes.json();
+                    setStatusLabels(Array.isArray(statusLabelsData) ? statusLabelsData : (Array.isArray(statusLabelsData.results) ? statusLabelsData.results : []));
+                }
             } catch (err) { console.error("Failed to fetch page data", err); } 
             finally { setLoading(false); }
         };
@@ -143,41 +152,18 @@ export default function CurrentTickets() {
 
     const handleExportSelected = () => {
         const ticketsToExport = tickets.filter(t => selectedTickets.includes(t.id));
-        if (ticketsToExport.length === 0) {
-            alert("No tickets selected to export.");
-            return;
-        }
-
+        if (ticketsToExport.length === 0) return;
         const headers = ['ID', 'Title', 'Status', 'Priority', 'Category', 'Employee', 'Agent'];
-        
         const rows = ticketsToExport.map(ticket => {
-            const statusName = ticket.status ? ticket.status.name : 'N/A';
             const agentName = itStaff.find(staff => staff.id === ticket.agent)?.username || 'Unassigned';
-
-            const escapeCsvField = (field) => {
-                const stringField = String(field || '');
-                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                    return `"${stringField.replace(/"/g, '""')}"`;
-                }
-                return stringField;
-            };
-
-            return [
-                ticket.id,
-                escapeCsvField(ticket.title),
-                escapeCsvField(statusName),
-                escapeCsvField(ticket.priority),
-                escapeCsvField(ticket.category),
-                escapeCsvField(ticket.requester_name),
-                escapeCsvField(agentName)
-            ].join(',');
+            const title = `"${ticket.title.replace(/"/g, '""')}"`;
+            return [ticket.id, title, ticket.status?.name, ticket.priority, ticket.category, ticket.requester_name, agentName].join(',');
         });
-
         const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "notifiq_tickets_export.csv");
+        link.setAttribute("download", "notifiq_tickets.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -189,9 +175,8 @@ export default function CurrentTickets() {
         const duplicatePromises = selectedTickets.map(id =>
             fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
         );
-        try {
-            await Promise.all(duplicatePromises);
-        } catch (err) { console.error("Failed to duplicate tickets:", err); } 
+        try { await Promise.all(duplicatePromises); } 
+        catch (err) { console.error("Failed to duplicate tickets:", err); } 
         finally {
             await fetchTickets();
             setSelectedTickets([]);
@@ -205,9 +190,8 @@ export default function CurrentTickets() {
         const deletePromises = selectedTickets.map(id =>
             fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
         );
-        try {
-            await Promise.all(deletePromises);
-        } catch (err) { console.error("Failed to delete tickets:", err); } 
+        try { await Promise.all(deletePromises); } 
+        catch (err) { console.error("Failed to delete tickets:", err); } 
         finally {
             await fetchTickets();
             setSelectedTickets([]);
@@ -259,7 +243,13 @@ export default function CurrentTickets() {
                         <div className="overflow-x-auto">
                             <div className="min-w-[1200px]">
                                 <div className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
-                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
+                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedTickets(groupTickets.map(t => t.id));
+                                        } else {
+                                            setSelectedTickets([]);
+                                        }
+                                    }}/></div>
                                     <div className="p-2 border-l border-border">Ticket</div>
                                     <div className="p-2 border-l border-border">Employee</div>
                                     <div className="p-2 border-l border-border text-center">Agent</div>
@@ -271,7 +261,7 @@ export default function CurrentTickets() {
                                 <div>
                                     {groupTickets.map(ticket => {
                                         const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
-                                        const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, colorClass: 'bg-blue-500' }));
+                                        const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, colorClass: `bg-[${s.color}]` }));
                                         return (
                                             <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
                                                 <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
