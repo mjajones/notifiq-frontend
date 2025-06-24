@@ -6,6 +6,7 @@ import { FiChevronDown, FiSearch } from 'react-icons/fi';
 import AuthContext from '../context/AuthContext.jsx';
 import StatusSelector from '../components/ui/StatusSelector.jsx';
 import ConfirmationDialog from '../components/ui/ConfirmationDialog.jsx';
+import EditLabelsModal from '../components/ui/EditLabelsModal.jsx';
 
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
@@ -56,6 +57,7 @@ export default function CurrentTickets() {
     const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [agentSearchTerm, setAgentSearchTerm] = useState("");
+    const [isEditLabelsModalOpen, setIsEditLabelsModalOpen] = useState(false);
     
     const { authTokens, user } = useContext(AuthContext);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -80,37 +82,44 @@ export default function CurrentTickets() {
         } catch (err) { setError(err.message); }
     }, [authTokens, API_URL]);
     
+    const fetchStatusLabels = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
+            if (res.ok) {
+                const data = await res.json();
+                setStatusLabels(Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []));
+            }
+        } catch (err) { console.error("Failed to fetch status labels", err); }
+    }, [authTokens, API_URL]);
+
     useEffect(() => {
         if (isUpdating) return;
         setLoading(true);
         const initialLoad = async () => {
-            await fetchTickets();
-            try {
-                const [itStaffRes, allUsersRes, statusLabelsRes] = await Promise.all([
-                    fetch(`${API_URL}/api/users/?group=IT%20Staff`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-                    fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-                    fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
-                ]);
-
-                if (itStaffRes.ok) {
-                    const itStaffData = await itStaffRes.json();
-                    setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : (Array.isArray(itStaffData) ? itStaffData : []));
-                }
-                if (allUsersRes.ok) {
-                    const allUsersData = await allUsersRes.json();
-                    setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
-                }
-                if (statusLabelsRes.ok) {
-                    const statusLabelsData = await statusLabelsRes.json();
-                    // --- DEBUG LINE ---
-                    console.log("Data received for Status Labels:", statusLabelsData);
-                    setStatusLabels(Array.isArray(statusLabelsData) ? statusLabelsData : (Array.isArray(statusLabelsData.results) ? statusLabelsData.results : []));
-                }
-            } catch (err) { console.error("Failed to fetch page data", err); } 
-            finally { setLoading(false); }
+            await Promise.all([
+                fetchTickets(),
+                fetchStatusLabels(),
+                (async () => {
+                    try {
+                        const itStaffResponse = await fetch(`${API_URL}/api/users/?group=IT%20Staff`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
+                        if (itStaffResponse.ok) {
+                            const itStaffData = await itStaffResponse.json();
+                            setItStaff(Array.isArray(itStaffData.results) ? itStaffData.results : (Array.isArray(itStaffData) ? itStaffData : []));
+                        }
+                        const allUsersResponse = await fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
+                        if (allUsersResponse.ok) {
+                            const allUsersData = await allUsersResponse.json();
+                            setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
+                        }
+                    } catch (err) {
+                        console.error("Failed to fetch user lists", err);
+                    }
+                })()
+            ]);
+            setLoading(false);
         };
         initialLoad();
-    }, [fetchTickets, authTokens, isUpdating]);
+    }, [fetchTickets, fetchStatusLabels, authTokens, isUpdating]);
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         setIsUpdating(true);
@@ -174,32 +183,22 @@ export default function CurrentTickets() {
 
     const handleDuplicateSelected = async () => {
         setIsUpdating(true);
-        const duplicatePromises = selectedTickets.map(id =>
-            fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
-        );
-        try { await Promise.all(duplicatePromises); } 
-        catch (err) { console.error("Failed to duplicate tickets:", err); } 
-        finally {
-            await fetchTickets();
-            setSelectedTickets([]);
-            setIsUpdating(false);
-        }
+        const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
+        try { await Promise.all(duplicatePromises); } catch (err) { console.error("Failed to duplicate tickets:", err); } 
+        finally { await fetchTickets(); setSelectedTickets([]); setIsUpdating(false); }
     };
 
     const handleDeleteSelected = async () => {
         setIsConfirmingDelete(false);
         setIsUpdating(true);
-        const deletePromises = selectedTickets.map(id =>
-            fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } })
-        );
-        try { await Promise.all(deletePromises); } 
-        catch (err) { console.error("Failed to delete tickets:", err); } 
-        finally {
-            await fetchTickets();
-            setSelectedTickets([]);
-            setIsUpdating(false);
-        }
+        const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
+        try { await Promise.all(deletePromises); } catch (err) { console.error("Failed to delete tickets:", err); } 
+        finally { await fetchTickets(); setSelectedTickets([]); setIsUpdating(false); }
     };
+
+    const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchStatusLabels(); };
+    const handleLabelUpdate = async (labelId, labelData) => { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchStatusLabels(); };
+    const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchStatusLabels(); } };
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
@@ -225,16 +224,13 @@ export default function CurrentTickets() {
 
     return (
         <div className="space-y-8">
-            <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
-                Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
-            </ConfirmationDialog>
+            <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets"> Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone. </ConfirmationDialog>
             <datalist id="employee-list">
                 {allEmployees.map(employee => (<option key={employee.id} value={`${employee.first_name} ${employee.last_name}`.trim() || employee.username} />))}
             </datalist>
+            <EditLabelsModal open={isEditLabelsModalOpen} onClose={() => setIsEditLabelsModalOpen(false)} labels={statusLabels} onCreate={handleLabelCreate} onUpdate={handleLabelUpdate} onDelete={handleLabelDelete} />
             
-            {assigningTicket && (
-                <AgentDropdownMenu options={filteredStaff} onSelect={(agentId) => handleTicketUpdate(assigningTicket.id, 'agent', agentId)} onClose={() => setAssigningTicket(null)} targetRect={assigningTicket.rect} searchTerm={agentSearchTerm} onSearchChange={(e) => setAgentSearchTerm(e.target.value)}/>
-            )}
+            {assigningTicket && (<AgentDropdownMenu options={filteredStaff} onSelect={(agentId) => handleTicketUpdate(assigningTicket.id, 'agent', agentId)} onClose={() => setAssigningTicket(null)} targetRect={assigningTicket.rect} searchTerm={agentSearchTerm} onSearchChange={(e) => setAgentSearchTerm(e.target.value)}/>)}
 
             <header><h1 className="text-3xl font-bold text-text-primary">{isITStaff ? 'All Tickets' : 'My Tickets'}</h1></header>
 
@@ -245,13 +241,7 @@ export default function CurrentTickets() {
                         <div className="overflow-x-auto">
                             <div className="min-w-[1200px]">
                                 <div className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
-                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => {
-                                        if (e.target.checked) {
-                                            setSelectedTickets(groupTickets.map(t => t.id));
-                                        } else {
-                                            setSelectedTickets([]);
-                                        }
-                                    }}/></div>
+                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(tickets.map(t => t.id)); } else { setSelectedTickets([]); } }}/></div>
                                     <div className="p-2 border-l border-border">Ticket</div>
                                     <div className="p-2 border-l border-border">Employee</div>
                                     <div className="p-2 border-l border-border text-center">Agent</div>
@@ -263,7 +253,7 @@ export default function CurrentTickets() {
                                 <div>
                                     {groupTickets.map(ticket => {
                                         const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
-                                        const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, colorClass: `bg-[${s.color}]` }));
+                                        const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, color: s.color }));
                                         return (
                                             <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
                                                 <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
@@ -272,7 +262,7 @@ export default function CurrentTickets() {
                                                 <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
                                                     {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}</button>
                                                 </div>
-                                                <div className="p-2 border-l border-border"><StatusSelector options={statusAsOptions} value={ticket.status?.id} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status_id', newValue)} /></div>
+                                                <div className="p-2 border-l border-border"><StatusSelector options={statusAsOptions} value={ticket.status?.id} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status_id', newValue)} onEditLabels={() => setIsEditLabelsModalOpen(true)} /></div>
                                                 <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
                                                 <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
                                                 <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>

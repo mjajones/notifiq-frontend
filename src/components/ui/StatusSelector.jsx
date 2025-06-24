@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FiEdit } from 'react-icons/fi';
 
-function DropdownList({ options, onSelect, onClose, targetRect }) {
+function DropdownList({ options, onSelect, onClose, targetRect, onEditLabels }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -34,26 +34,15 @@ function DropdownList({ options, onSelect, onClose, targetRect }) {
   }, [onClose]);
 
   return createPortal(
-    <div
-      ref={dropdownRef}
-      className="fixed z-50"
-    >
+    <div ref={dropdownRef} className="fixed z-50">
       <ul className="py-1 bg-foreground border border-border rounded-md shadow-lg">
         {options.map((option) => (
-          <li
-            key={option.value}
-            onClick={() => onSelect(option)}
-            className={`px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md m-1 cursor-pointer ${option.colorClass}`}
-          >
+          <li key={option.value} onClick={() => onSelect(option)} className={`px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md m-1 cursor-pointer ${option.colorClass}`}>
             {option.label}
           </li>
         ))}
-        {/* Edit Labels Button */}
         <li className="border-t border-border mt-1 pt-1">
-            <button 
-                onClick={() => alert("Building a fully editable label system requires backend changes.")}
-                className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-gray-100 flex items-center gap-2"
-            >
+            <button onClick={onEditLabels} className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-gray-100 flex items-center gap-2">
                 <FiEdit size={14} /> Edit Labels
             </button>
         </li>
@@ -64,7 +53,7 @@ function DropdownList({ options, onSelect, onClose, targetRect }) {
 }
 
 
-export default function StatusSelector({ options, value, onChange }) {
+export default function StatusSelector({ options, value, onChange, onEditLabels }) {
     const [isOpen, setIsOpen] = useState(false);
     const [buttonRect, setButtonRect] = useState(null);
     const buttonRef = useRef(null);
@@ -85,20 +74,11 @@ export default function StatusSelector({ options, value, onChange }) {
 
     return (
         <div className="w-full" ref={buttonRef}>
-            <button
-                type="button"
-                onClick={handleToggle}
-                className={`w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md truncate ${selectedOption.colorClass || 'bg-gray-400'}`}
-            >
+            <button type="button" onClick={handleToggle} className={`w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md truncate`} style={{ backgroundColor: selectedOption.color || '#808080' }}>
                 {selectedOption.label || 'Select...'}
             </button>
             {isOpen && (
-                <DropdownList
-                    options={options}
-                    onSelect={handleSelect}
-                    onClose={() => setIsOpen(false)}
-                    targetRect={buttonRect}
-                />
+                <DropdownList options={options} onSelect={handleSelect} onClose={() => setIsOpen(false)} targetRect={buttonRect} onEditLabels={onEditLabels} />
             )}
         </div>
     );
