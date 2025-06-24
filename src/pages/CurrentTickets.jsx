@@ -222,29 +222,24 @@ export default function CurrentTickets() {
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
-        tickets.forEach(ticket => {
-            const statusName = ticket.status?.name?.toLowerCase() || 'new';
-            if (!ticket.agent) {
-                groups['Unassigned Tickets'].push(ticket);
-            } else if (['open', 'new', 'in progress', 'new reply'].includes(statusName)) {
-                groups['Open Tickets'].push(ticket);
-            } else if (statusName === 'awaiting customer') {
-                groups['Waiting for Response'].push(ticket);
-            } else if (statusName === 'resolved') {
-                groups['Resolved Tickets'].push(ticket);
-            }
-        });
+        if (Array.isArray(tickets)) {
+            tickets.forEach(ticket => {
+                const statusName = ticket.status?.name?.toLowerCase() || 'new';
+                if (!ticket.agent) {
+                    groups['Unassigned Tickets'].push(ticket);
+                } else if (['open', 'new', 'in progress', 'new reply'].includes(statusName)) {
+                    groups['Open Tickets'].push(ticket);
+                } else if (statusName === 'awaiting customer') {
+                    groups['Waiting for Response'].push(ticket);
+                } else if (statusName === 'resolved') {
+                    groups['Resolved Tickets'].push(ticket);
+                }
+            });
+        }
         return groups;
     }, [tickets]);
-
-    console.log("Current 'tickets' state:", tickets);
-    console.log("Processed 'allTicketGroups':", allTicketGroups);
     
-    const filteredStaff = itStaff.filter(staff => {
-        const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
-        return fullName.includes(agentSearchTerm.toLowerCase()) || staff.username.toLowerCase().includes(agentSearchTerm.toLowerCase());
-    });
-    
+    const filteredStaff = itStaff.filter(staff => { /* ... */ });
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
