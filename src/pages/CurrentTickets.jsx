@@ -239,6 +239,20 @@ export default function CurrentTickets() {
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
     if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
 
+    const getAgentInitials = (agentId) => {
+        if (!agentId) return <FaUserPlus />;
+        const agent = allEmployees.find(emp => emp.id === agentId);
+        if (!agent) return <FaUserPlus />;
+        
+        const firstInitial = agent.first_name?.[0] || '';
+        const lastInitial = agent.last_name?.[0] || '';
+
+        if (firstInitial && lastInitial) {
+            return `${firstInitial}${lastInitial}`.toUpperCase();
+        }
+        return (agent.username?.substring(0, 2) || 'N/A').toUpperCase();
+    };
+
     return (
         <div className="space-y-8">
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
@@ -249,7 +263,7 @@ export default function CurrentTickets() {
             </datalist>
             <EditLabelsModal open={isEditLabelsModalOpen} onClose={() => setIsEditLabelsModalOpen(false)} labels={statusLabels} onCreate={handleLabelCreate} onUpdate={handleLabelUpdate} onDelete={handleLabelDelete} />
             
-            {assigningTicket && (<AgentDropdownMenu options={filteredStaff} onSelect={(agentId) => handleTicketUpdate(assigningTicket.id, 'agent', agentId)} onClose={() => setAssigningTicket(null)} targetRect={assigningTicket.rect} searchTerm={agentSearchTerm} onSearchChange={(e) => setAgentSearchTerm(e.target.value)}/>)}
+            {assigningTicket && (<AgentDropdownMenu options={filteredStaff} onSelect={(agentId) => handleTicketUpdate(tickets.find(t => t.id === assigningTicket.id), 'agent', agentId)} onClose={() => setAssigningTicket(null)} targetRect={assigningTicket.rect} searchTerm={agentSearchTerm} onSearchChange={(e) => setAgentSearchTerm(e.target.value)}/>)}
 
             <header><h1 className="text-3xl font-bold text-text-primary">{isITStaff ? 'All Tickets' : 'My Tickets'}</h1></header>
 
@@ -271,18 +285,17 @@ export default function CurrentTickets() {
                                 </div>
                                 <div>
                                     {groupTickets.map(ticket => {
-                                        const agentInfo = itStaff.find(staff => staff.id === ticket.agent);
                                         const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, color: s.color }));
                                         return (
                                             <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
                                                 <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
                                                 <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
-                                                <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter or search employee" list="employee-list"/></div>
-                                                <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
-                                                    {agentInfo ? (agentInfo.first_name?.[0] || agentInfo.username[0]).toUpperCase() : <FaUserPlus />}</button>
+                                                <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter or search employee" list="employee-list"/></div>
+                                                <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={allEmployees.find(emp => emp.id === ticket.agent)?.first_name || 'Assign Agent'}>
+                                                    {getAgentInitials(ticket.agent)}</button>
                                                 </div>
-                                                <div className="p-2 border-l border-border"><StatusSelector options={statusAsOptions} value={ticket.status?.id} onChange={(newValue) => handleTicketUpdate(ticket.id, 'status_id', newValue)} onEditLabels={() => setIsEditLabelsModalOpen(true)} /></div>
-                                                <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket.id, 'priority', newValue)} /></div>
+                                                <div className="p-2 border-l border-border"><StatusSelector options={statusAsOptions} value={ticket.status?.id} onChange={(newValue) => handleTicketUpdate(ticket, 'status_id', newValue)} onEditLabels={() => setIsEditLabelsModalOpen(true)} /></div>
+                                                <div className="p-2 border-l border-border"><StatusSelector options={priorityOptions} value={ticket.priority} onChange={(newValue) => handleTicketUpdate(ticket, 'priority', newValue)} /></div>
                                                 <div className="p-2 border-l border-border text-text-secondary">{ticket.category}</div>
                                                 <div className="p-2 border-l border-border text-text-secondary">{new Date(ticket.submitted_at).toLocaleDateString()}</div>
                                             </div>
