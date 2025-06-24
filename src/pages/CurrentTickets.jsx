@@ -78,6 +78,9 @@ export default function CurrentTickets() {
             const response = await fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
+
+            console.log("Full ticket list received from server:", data);
+
             setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
         } catch (err) { setError(err.message); }
     }, [authTokens, API_URL]);
