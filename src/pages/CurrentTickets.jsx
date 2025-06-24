@@ -102,6 +102,8 @@ export default function CurrentTickets() {
                 }
                 if (statusLabelsRes.ok) {
                     const statusLabelsData = await statusLabelsRes.json();
+                    // --- DEBUG LINE ---
+                    console.log("Data received for Status Labels:", statusLabelsData);
                     setStatusLabels(Array.isArray(statusLabelsData) ? statusLabelsData : (Array.isArray(statusLabelsData.results) ? statusLabelsData.results : []));
                 }
             } catch (err) { console.error("Failed to fetch page data", err); } 
