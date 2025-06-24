@@ -81,17 +81,19 @@ export default function CurrentTickets() {
             setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
         } catch (err) { setError(err.message); }
     }, [authTokens, API_URL]);
-    
+
     const fetchStatusLabels = useCallback(async () => {
+        if (!authTokens) return;
         try {
             const res = await fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
             if (res.ok) {
                 const data = await res.json();
-                setStatusLabels(Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []));
+                const labels = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+                setStatusLabels(labels);
             }
         } catch (err) { console.error("Failed to fetch status labels", err); }
     }, [authTokens, API_URL]);
-
+    
     useEffect(() => {
         if (isUpdating) return;
         setLoading(true);
@@ -111,9 +113,7 @@ export default function CurrentTickets() {
                             const allUsersData = await allUsersResponse.json();
                             setAllEmployees(Array.isArray(allUsersData.results) ? allUsersData.results : (Array.isArray(allUsersData) ? allUsersData : []));
                         }
-                    } catch (err) {
-                        console.error("Failed to fetch user lists", err);
-                    }
+                    } catch (err) { console.error("Failed to fetch user lists", err); }
                 })()
             ]);
             setLoading(false);
@@ -127,9 +127,12 @@ export default function CurrentTickets() {
         try {
             const formData = new FormData();
             formData.append(field, value);
+
             if (field === 'agent' && value) {
                 const openStatus = statusLabels.find(s => s.name.toLowerCase() === 'open');
-                if (openStatus) formData.append('status_id', openStatus.id);
+                if (openStatus) {
+                    formData.append('status_id', openStatus.id);
+                }
             }
             await fetch(`${API_URL}/api/incidents/${ticketId}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
             await fetchTickets();
@@ -142,19 +145,33 @@ export default function CurrentTickets() {
     const handleBulkMove = async (groupName) => {
         setIsUpdating(true);
         setIsMoveMenuOpen(false);
+
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
             let statusToApply;
+
             switch (groupName) {
-                case 'Unassigned Tickets': formData.append('agent', ''); break;
-                case 'Open Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open'); break;
-                case 'Waiting for Response': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer'); break;
-                case 'Resolved Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved'); break;
-                default: return null;
+                case 'Unassigned Tickets':
+                    formData.append('agent', ''); // Empty string will set FK to null
+                    break;
+                case 'Open Tickets':
+                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open');
+                    if (statusToApply) formData.append('status_id', statusToApply.id);
+                    break;
+                case 'Waiting for Response':
+                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer');
+                    if (statusToApply) formData.append('status_id', statusToApply.id);
+                    break;
+                case 'Resolved Tickets':
+                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved');
+                    if (statusToApply) formData.append('status_id', statusToApply.id);
+                    break;
+                default:
+                    return null;
             }
-            if (statusToApply) formData.append('status_id', statusToApply.id);
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
+
         await Promise.all(updates);
         await fetchTickets();
         setSelectedTickets([]);
@@ -204,10 +221,15 @@ export default function CurrentTickets() {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
         tickets.forEach(ticket => {
             const statusName = ticket.status?.name?.toLowerCase() || 'new';
-            if (!ticket.agent) groups['Unassigned Tickets'].push(ticket);
-            else if (['open', 'new', 'in progress', 'new reply'].includes(statusName)) groups['Open Tickets'].push(ticket);
-            else if (statusName === 'awaiting customer') groups['Waiting for Response'].push(ticket);
-            else if (statusName === 'resolved') groups['Resolved Tickets'].push(ticket);
+            if (!ticket.agent) {
+                groups['Unassigned Tickets'].push(ticket);
+            } else if (['open', 'new', 'in progress', 'new reply'].includes(statusName)) {
+                groups['Open Tickets'].push(ticket);
+            } else if (statusName === 'awaiting customer') {
+                groups['Waiting for Response'].push(ticket);
+            } else if (statusName === 'resolved') {
+                groups['Resolved Tickets'].push(ticket);
+            }
         });
         return groups;
     }, [tickets]);
@@ -224,7 +246,9 @@ export default function CurrentTickets() {
 
     return (
         <div className="space-y-8">
-            <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets"> Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone. </ConfirmationDialog>
+            <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
+                Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
+            </ConfirmationDialog>
             <datalist id="employee-list">
                 {allEmployees.map(employee => (<option key={employee.id} value={`${employee.first_name} ${employee.last_name}`.trim() || employee.username} />))}
             </datalist>
