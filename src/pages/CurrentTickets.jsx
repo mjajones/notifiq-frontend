@@ -236,6 +236,9 @@ export default function CurrentTickets() {
         });
         return groups;
     }, [tickets]);
+
+    console.log("Current 'tickets' state:", tickets);
+    console.log("Processed 'allTicketGroups':", allTicketGroups);
     
     const filteredStaff = itStaff.filter(staff => {
         const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
