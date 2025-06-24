@@ -221,26 +221,30 @@ export default function CurrentTickets() {
     const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchStatusLabels(); } };
     
     const allTicketGroups = useMemo(() => {
-        const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
+        const groups = { 
+            'Unassigned Tickets': [], 
+            'Open Tickets': [], 
+            'Waiting for Response': [], 
+            'Resolved Tickets': [] 
+        };
+
         if (Array.isArray(tickets)) {
             tickets.forEach(ticket => {
-                const statusName = ticket.status?.name?.toLowerCase() || 'new';
+                const statusName = ticket.status?.name?.toLowerCase();
+
                 if (!ticket.agent) {
                     groups['Unassigned Tickets'].push(ticket);
-                } else if (['open', 'new', 'in progress', 'new reply'].includes(statusName)) {
-                    groups['Open Tickets'].push(ticket);
                 } else if (statusName === 'awaiting customer') {
                     groups['Waiting for Response'].push(ticket);
                 } else if (statusName === 'resolved') {
                     groups['Resolved Tickets'].push(ticket);
+                } else {
+                    groups['Open Tickets'].push(ticket);
                 }
             });
         }
         return groups;
     }, [tickets]);
-
-    console.log("Current 'tickets' state:", tickets);
-    console.log("Processed 'allTicketGroups':", allTicketGroups);
     
     const filteredStaff = itStaff.filter(staff => { /* ... */ });
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
