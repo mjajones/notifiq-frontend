@@ -8,19 +8,15 @@ function DropdownList({ options, onSelect, onClose, targetRect, onEditLabels }) 
   useEffect(() => {
     const dropdownEl = dropdownRef.current;
     if (!dropdownEl || !targetRect) return;
-
     const { innerHeight } = window;
     const dropdownHeight = dropdownEl.offsetHeight;
-    
     let top = targetRect.bottom + 4;
     if ((top + dropdownHeight) > innerHeight && targetRect.top > dropdownHeight) {
       top = targetRect.top - dropdownHeight - 4;
     }
-
     dropdownEl.style.top = `${top}px`;
     dropdownEl.style.left = `${targetRect.left}px`;
     dropdownEl.style.width = `${targetRect.width}px`;
-
   }, [targetRect]);
   
   useEffect(() => {
@@ -37,15 +33,25 @@ function DropdownList({ options, onSelect, onClose, targetRect, onEditLabels }) 
     <div ref={dropdownRef} className="fixed z-50">
       <ul className="py-1 bg-foreground border border-border rounded-md shadow-lg">
         {options.map((option) => (
-          <li key={option.value} onClick={() => onSelect(option)} className={`px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md m-1 cursor-pointer ${option.colorClass}`}>
+          <li
+            key={option.value}
+            onClick={() => onSelect(option)}
+            className={`px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md m-1 cursor-pointer ${option.colorClass || ''}`}
+            style={{ backgroundColor: option.color || undefined }}
+          >
             {option.label}
           </li>
         ))}
-        <li className="border-t border-border mt-1 pt-1">
-            <button onClick={onEditLabels} className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-gray-100 flex items-center gap-2">
-                <FiEdit size={14} /> Edit Labels
-            </button>
-        </li>
+        {onEditLabels && (
+            <li className="border-t border-border mt-1 pt-1">
+                <button 
+                    onClick={onEditLabels}
+                    className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-gray-100 flex items-center gap-2"
+                >
+                    <FiEdit size={14} /> Edit Labels
+                </button>
+            </li>
+        )}
       </ul>
     </div>,
     document.body
@@ -70,15 +76,32 @@ export default function StatusSelector({ options, value, onChange, onEditLabels 
         setIsOpen(false);
     };
 
-    const selectedOption = options.find(opt => opt.value.toLowerCase() === (value || '').toLowerCase()) || options[0] || {};
+    const selectedOption = options.find(opt => opt.value == value) || {};
+
+    const buttonClasses = `w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md truncate ${selectedOption.colorClass || ''}`;
+    
+    const buttonStyle = {
+      backgroundColor: selectedOption.colorClass ? undefined : (selectedOption.color || '#808080')
+    };
 
     return (
         <div className="w-full" ref={buttonRef}>
-            <button type="button" onClick={handleToggle} className={`w-full px-3 py-1.5 text-sm font-semibold text-white text-center rounded-md truncate`} style={{ backgroundColor: selectedOption.color || '#808080' }}>
+            <button
+                type="button"
+                onClick={handleToggle}
+                className={buttonClasses} 
+                style={buttonStyle}       
+            >
                 {selectedOption.label || 'Select...'}
             </button>
             {isOpen && (
-                <DropdownList options={options} onSelect={handleSelect} onClose={() => setIsOpen(false)} targetRect={buttonRect} onEditLabels={onEditLabels} />
+                <DropdownList
+                    options={options}
+                    onSelect={handleSelect}
+                    onClose={() => setIsOpen(false)}
+                    targetRect={buttonRect}
+                    onEditLabels={onEditLabels}
+                />
             )}
         </div>
     );
