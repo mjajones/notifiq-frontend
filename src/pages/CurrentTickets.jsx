@@ -10,7 +10,6 @@ import EditLabelsModal from '../components/ui/EditLabelsModal.jsx';
 
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
-
     useEffect(() => {
         const dropdownEl = dropdownRef.current;
         if (!dropdownEl || !targetRect) return;
@@ -24,7 +23,6 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         dropdownEl.style.left = `${targetRect.left}px`;
         dropdownEl.style.width = `${targetRect.width < 256 ? 256 : targetRect.width}px`;
     }, [targetRect]);
-
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) onClose();
@@ -32,7 +30,6 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [onClose]);
-
     return createPortal(
         <div ref={dropdownRef} className="fixed z-50 text-left">
             <div className="w-full bg-white border border-border rounded-md shadow-lg">
@@ -78,25 +75,21 @@ export default function CurrentTickets() {
             const response = await fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-
-            console.log("Full ticket list received from server:", data);
-
             setTickets(Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []));
         } catch (err) { setError(err.message); }
     }, [authTokens, API_URL]);
-
+    
     const fetchStatusLabels = useCallback(async () => {
         if (!authTokens) return;
         try {
             const res = await fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } });
             if (res.ok) {
                 const data = await res.json();
-                const labels = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
-                setStatusLabels(labels);
+                setStatusLabels(Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []));
             }
         } catch (err) { console.error("Failed to fetch status labels", err); }
     }, [authTokens, API_URL]);
-    
+
     useEffect(() => {
         if (isUpdating) return;
         setLoading(true);
@@ -130,12 +123,9 @@ export default function CurrentTickets() {
         try {
             const formData = new FormData();
             formData.append(field, value);
-
             if (field === 'agent' && value) {
                 const openStatus = statusLabels.find(s => s.name.toLowerCase() === 'open');
-                if (openStatus) {
-                    formData.append('status_id', openStatus.id);
-                }
+                if (openStatus) formData.append('status_id', openStatus.id);
             }
             await fetch(`${API_URL}/api/incidents/${ticketId}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
             await fetchTickets();
@@ -148,33 +138,19 @@ export default function CurrentTickets() {
     const handleBulkMove = async (groupName) => {
         setIsUpdating(true);
         setIsMoveMenuOpen(false);
-
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
             let statusToApply;
-
             switch (groupName) {
-                case 'Unassigned Tickets':
-                    formData.append('agent', ''); // Empty string will set FK to null
-                    break;
-                case 'Open Tickets':
-                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open');
-                    if (statusToApply) formData.append('status_id', statusToApply.id);
-                    break;
-                case 'Waiting for Response':
-                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer');
-                    if (statusToApply) formData.append('status_id', statusToApply.id);
-                    break;
-                case 'Resolved Tickets':
-                    statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved');
-                    if (statusToApply) formData.append('status_id', statusToApply.id);
-                    break;
-                default:
-                    return null;
+                case 'Unassigned Tickets': formData.append('agent', ''); break;
+                case 'Open Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open'); break;
+                case 'Waiting for Response': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer'); break;
+                case 'Resolved Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved'); break;
+                default: return null;
             }
+            if (statusToApply) formData.append('status_id', statusToApply.id);
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
-
         await Promise.all(updates);
         await fetchTickets();
         setSelectedTickets([]);
@@ -221,17 +197,10 @@ export default function CurrentTickets() {
     const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchStatusLabels(); } };
     
     const allTicketGroups = useMemo(() => {
-        const groups = { 
-            'Unassigned Tickets': [], 
-            'Open Tickets': [], 
-            'Waiting for Response': [], 
-            'Resolved Tickets': [] 
-        };
-
+        const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
         if (Array.isArray(tickets)) {
             tickets.forEach(ticket => {
                 const statusName = ticket.status?.name?.toLowerCase();
-
                 if (!ticket.agent) {
                     groups['Unassigned Tickets'].push(ticket);
                 } else if (statusName === 'awaiting customer') {
@@ -246,7 +215,11 @@ export default function CurrentTickets() {
         return groups;
     }, [tickets]);
     
-    const filteredStaff = itStaff.filter(staff => { /* ... */ });
+    const filteredStaff = itStaff.filter(staff => {
+        const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
+        return fullName.includes(agentSearchTerm.toLowerCase()) || staff.username.toLowerCase().includes(agentSearchTerm.toLowerCase());
+    });
+    
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
