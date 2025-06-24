@@ -238,6 +238,9 @@ export default function CurrentTickets() {
         }
         return groups;
     }, [tickets]);
+
+    console.log("Current 'tickets' state:", tickets);
+    console.log("Processed 'allTicketGroups':", allTicketGroups);
     
     const filteredStaff = itStaff.filter(staff => { /* ... */ });
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
