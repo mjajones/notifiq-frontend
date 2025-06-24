@@ -19,7 +19,6 @@ export default function Dashboard() {
         setLoading(false);
         return;
       }
-
       try {
         const resp = await fetch(`${API_URL}/api/incidents/`, {
           method: 'GET',
@@ -30,7 +29,6 @@ export default function Dashboard() {
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        
         const results = data.results || (Array.isArray(data) ? data : []);
         setTickets(results);
       } catch (err) {
@@ -43,40 +41,30 @@ export default function Dashboard() {
     fetchTickets();
   }, [authTokens]);
 
-  const now = dayjs();
-  const unresolvedTickets = tickets.filter(t => t.status && !['resolved', 'closed'].includes(t.status.toLowerCase()));
+  // UPDATED: Filtering logic now checks ticket.status.name
+  const unresolvedTickets = tickets.filter(t => t.status && !['resolved', 'closed'].includes(t.status.name?.toLowerCase()));
   
+  const now = dayjs();
   const overdueCount = unresolvedTickets.filter(t => t.due_date && dayjs(t.due_date).isBefore(now, 'day')).length;
   const dueTodayCount = unresolvedTickets.filter(t => t.due_date && dayjs(t.due_date).isSame(now, 'day')).length;
-  const openCount = unresolvedTickets.filter(t => t.status && t.status.toLowerCase() === 'open').length;
-  const onHoldCount = unresolvedTickets.filter(t => t.status && t.status.toLowerCase() === 'on hold').length;
+  const openCount = unresolvedTickets.filter(t => t.status?.name?.toLowerCase() === 'open').length;
+  const onHoldCount = unresolvedTickets.filter(t => t.status?.name?.toLowerCase() === 'on hold').length;
   const unassignedCount = tickets.filter(t => !t.agent).length;
   const watchingCount = 0;
 
-  // Priority Chart Data
   const priorityBuckets = ['Low', 'Medium', 'High', 'Urgent'];
   const priorityCounts = priorityBuckets.map(p => unresolvedTickets.filter(t => t.priority === p).length);
   const priorityColors = [
-      { light: '#93c5fd', dark: '#3b82f6' }, // Blue
-      { light: '#fcd34d', dark: '#f59e0b' }, // Amber
-      { light: '#fca5a5', dark: '#ef4444' }, // Red
-      { light: '#f87171', dark: '#b91c1c' }  // Darker Red
+      { light: '#93c5fd', dark: '#3b82f6' }, { light: '#fcd34d', dark: '#f59e0b' },
+      { light: '#fca5a5', dark: '#ef4444' }, { light: '#f87171', dark: '#b91c1c' }
   ];
 
-  // Status Chart Data
-  const statusBuckets = Array.from(new Set(unresolvedTickets.map(t => t.status)));
-  const statusCounts = statusBuckets.map(s => unresolvedTickets.filter(t => t.status === s).length);
-  const statusColors = [
-      { light: '#a5b4fc', dark: '#6366f1' }, // Indigo
-      { light: '#93c5fd', dark: '#3b82f6' }, // Blue
-      { light: '#c4b5fd', dark: '#8b5cf6' }, // Purple
-      { light: '#f9a8d4', dark: '#ec4899' }, // Pink
-  ].slice(0, statusBuckets.length);
+  const statusBuckets = Array.from(new Set(unresolvedTickets.map(t => t.status?.name).filter(Boolean)));
+  const statusCounts = statusBuckets.map(s => unresolvedTickets.filter(t => t.status?.name === s).length);
+  const statusColors = unresolvedTickets.map(t => ({ light: t.status?.color, dark: t.status?.color }));
 
-  const sevenDaysAgo = now.subtract(7, 'day');
-  const newTicketsCount = tickets.filter(t => dayjs(t.submitted_at).isAfter(sevenDaysAgo)).length;
   const myOpenCount = user ? unresolvedTickets.filter(t => t.agent === user.user_id).length : 0;
-
+  const newTicketsCount = tickets.filter(t => dayjs(t.submitted_at).isAfter(now.subtract(7, 'day'))).length;
   const newAndMyOpenData = [
       { label: 'New (last 7d)', value: newTicketsCount, color: 'linear-gradient(to right, #a5b4fc, #6366f1)'},
       { label: 'My Open Tickets', value: myOpenCount, color: 'linear-gradient(to right, #93c5fd, #3b82f6)'},
