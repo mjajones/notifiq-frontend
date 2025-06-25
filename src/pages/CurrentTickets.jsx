@@ -91,10 +91,7 @@ export default function CurrentTickets() {
 
         if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
             const data = await usersResult.value.json();
-            const results = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
-            setAllEmployees(results);
-
-            console.log("All employees from API:", results);
+            setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
         } else {
             console.error("Failed to fetch users:", usersResult.reason || usersResult.value?.statusText);
         }
@@ -167,7 +164,7 @@ export default function CurrentTickets() {
         if (ticketsToExport.length === 0) return;
         const headers = ['ID', 'Title', 'Status', 'Priority', 'Category', 'Employee', 'Agent'];
         const rows = ticketsToExport.map(ticket => {
-            const agentName = allEmployees.find(staff => staff.id === ticket.agent)?.username || 'Unassigned';
+            const agentName = allEmployees.find(staff => staff.id === ticket.agent?.id)?.username || 'Unassigned';
             const title = `"${ticket.title.replace(/"/g, '""')}"`;
             return [ticket.id, title, ticket.status?.name, ticket.priority, ticket.category, ticket.requester_name, agentName].join(',');
         });
@@ -219,11 +216,8 @@ export default function CurrentTickets() {
     const itStaff = useMemo(() => {
         return allEmployees.filter(emp => {
             const hasITGroup = emp.groups?.some(group => {
-                if (typeof group === 'object' && group !== null && group.name) {
-                    return group.name === 'IT Staff';
-                }
-                if (typeof group === 'string') {
-                    return group === 'IT Staff';
+                if (typeof group === 'object' && group !== null && group.name === 'IT Staff') {
+                    return true;
                 }
                 return false;
             });
@@ -238,19 +232,14 @@ export default function CurrentTickets() {
     
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
-    const getAgentInitials = (agentId) => {
+    const getAgentInitials = (agentData) => {
+        const agentId = (typeof agentData === 'object' && agentData !== null) ? agentData.id : agentData;
+    
         if (!agentId) return <FaUserPlus />;
     
         const agent = allEmployees.find(emp => emp.id === agentId);
     
-        // If an agent ID exists but the agent isn't found, log an error to the console
         if (!agent) {
-            console.error(
-                `DEBUG: Could not find agent with ID: ${agentId}. This usually means the 'allEmployees' list is missing this user or there is a data type mismatch (e.g., string vs. number).`,
-                {
-                    allEmployeeIds: allEmployees.map(e => e.id)
-                }
-            );
             return <FaUserPlus />;
         }
     
@@ -298,7 +287,7 @@ export default function CurrentTickets() {
                                 </div>
                                 <div>
                                     {groupTickets.map(ticket => {
-                                        const agentInfo = allEmployees.find(staff => staff.id === ticket.agent);
+                                        const agentInfo = allEmployees.find(staff => staff.id === ticket.agent?.id);
                                         const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, color: s.color }));
                                         return (
                                             <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
