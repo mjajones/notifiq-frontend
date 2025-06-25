@@ -92,6 +92,8 @@ export default function CurrentTickets() {
         if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
             const data = await usersResult.value.json();
             setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
+
+            console.log("All employees from API:", results);
         } else {
             console.error("Failed to fetch users:", usersResult.reason || usersResult.value?.statusText);
         }
