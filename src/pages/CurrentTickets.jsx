@@ -91,7 +91,8 @@ export default function CurrentTickets() {
 
         if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
             const data = await usersResult.value.json();
-            setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
+            const results = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+            setAllEmployees(results);
 
             console.log("All employees from API:", results);
         } else {
