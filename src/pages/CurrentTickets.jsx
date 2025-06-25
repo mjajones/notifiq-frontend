@@ -44,7 +44,6 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
     );
 }
 
-
 export default function CurrentTickets() {
     const [tickets, setTickets] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
@@ -74,36 +73,45 @@ export default function CurrentTickets() {
     const fetchData = useCallback(async () => {
         if (!authTokens) return;
         setLoading(true);
-        try {
-            const [ticketsRes, usersRes, statusLabelsRes] = await Promise.all([
-                fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-                fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-                fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
-            ]);
+        setError(null);
 
-            if (!ticketsRes.ok) throw new Error(`Failed to fetch tickets: ${ticketsRes.status}`);
-            if (!usersRes.ok) throw new Error(`Failed to fetch users: ${usersRes.status}`);
-            if (!statusLabelsRes.ok) throw new Error(`Failed to fetch status labels: ${statusLabelsRes.status}`);
+        const [ticketsResult, usersResult, statusLabelsResult] = await Promise.allSettled([
+            fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
+            fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
+            fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
+        ]);
 
-            const ticketsData = await ticketsRes.json();
-            const usersData = await usersRes.json();
-            const statusLabelsData = await statusLabelsRes.json();
-
-            setTickets(Array.isArray(ticketsData.results) ? ticketsData.results : []);
-            setAllEmployees(Array.isArray(usersData.results) ? usersData.results : []);
-            setStatusLabels(Array.isArray(statusLabelsData) ? statusLabelsData : []);
-
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        if (ticketsResult.status === 'fulfilled' && ticketsResult.value.ok) {
+            const data = await ticketsResult.value.json();
+            const results = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+            setTickets(results);
+        } else {
+            console.error("Failed to fetch tickets:", ticketsResult.reason || ticketsResult.value?.statusText);
+            setError("Failed to load tickets. Please try again later.");
         }
+
+        if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
+            const data = await usersResult.value.json();
+            const results = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+            setAllEmployees(results);
+        } else {
+            console.error("Failed to fetch users:", usersResult.reason || usersResult.value?.statusText);
+        }
+
+        if (statusLabelsResult.status === 'fulfilled' && statusLabelsResult.value.ok) {
+            const data = await statusLabelsResult.value.json();
+            const results = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
+            setStatusLabels(results);
+        } else {
+            console.error("Failed to fetch status labels:", statusLabelsResult.reason || statusLabelsResult.value?.statusText);
+        }
+
+        setLoading(false);
     }, [authTokens, API_URL]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
-
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         setAssigningTicket(null);
@@ -111,14 +119,19 @@ export default function CurrentTickets() {
             const formData = new FormData();
             formData.append(field, value);
             
-            await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${authTokens.access}` },
                 body: formData
             });
-            await fetchData();
+
+            if(response.ok) {
+                await fetchData();
+            } else {
+                console.error("Failed to update ticket on the server.");
+            }
         } catch (err) {
-            console.error('Failed to update ticket:', err);
+            console.error('An error occurred while updating the ticket:', err);
         }
     };
     
@@ -139,12 +152,11 @@ export default function CurrentTickets() {
             if (statusToApply) {
                 formData.append('status_id', statusToApply.id);
             } else if (groupName !== 'Unassigned Tickets') {
-                console.error(`Could not find a status label for group "${groupName}"`);
                 return null;
             }
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
-
+        
         await Promise.all(updates);
         await fetchData();
         setSelectedTickets([]);
@@ -172,27 +184,17 @@ export default function CurrentTickets() {
 
     const handleDuplicateSelected = async () => {
         const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
-        try {
-            await Promise.all(duplicatePromises);
-        } catch (err) {
-            console.error("Failed to duplicate tickets:", err);
-        } finally {
-            await fetchData();
-            setSelectedTickets([]);
-        }
+        await Promise.all(duplicatePromises);
+        await fetchData();
+        setSelectedTickets([]);
     };
 
     const handleDeleteSelected = async () => {
         setIsConfirmingDelete(false);
         const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
-        try {
-            await Promise.all(deletePromises);
-        } catch (err) {
-            console.error("Failed to delete tickets:", err);
-        } finally {
-            await fetchData();
-            setSelectedTickets([]);
-        }
+        await Promise.all(deletePromises);
+        await fetchData();
+        setSelectedTickets([]);
     };
 
     const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
@@ -202,19 +204,17 @@ export default function CurrentTickets() {
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
-        if (Array.isArray(tickets)) {
-            tickets.forEach(ticket => {
-                const statusName = ticket.status?.name?.toLowerCase();
-                if (!ticket.agent) { groups['Unassigned Tickets'].push(ticket); } 
-                else if (statusName === 'awaiting customer') { groups['Waiting for Response'].push(ticket); } 
-                else if (statusName === 'resolved') { groups['Resolved Tickets'].push(ticket); } 
-                else { groups['Open Tickets'].push(ticket); }
-            });
-        }
+        tickets.forEach(ticket => {
+            const statusName = ticket.status?.name?.toLowerCase();
+            if (!ticket.agent) { groups['Unassigned Tickets'].push(ticket); } 
+            else if (statusName === 'awaiting customer') { groups['Waiting for Response'].push(ticket); } 
+            else if (statusName === 'resolved' || statusName === 'closed') { groups['Resolved Tickets'].push(ticket); } 
+            else { groups['Open Tickets'].push(ticket); }
+        });
         return groups;
     }, [tickets]);
 
-    const itStaff = useMemo(() => allEmployees.filter(emp => emp.groups?.some(g => g.name === 'IT Staff') || emp.is_superuser), [allEmployees]);
+    const itStaff = useMemo(() => allEmployees.filter(emp => (emp.groups?.some(g => g.name === 'IT Staff')) || emp.is_superuser), [allEmployees]);
     
     const filteredStaff = itStaff.filter(staff => {
         const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
@@ -238,10 +238,10 @@ export default function CurrentTickets() {
     };
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
-    if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
+    if (error) return <p className="p-4 text-red-500">{error}</p>;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 p-4 md:p-6">
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
                 Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
             </ConfirmationDialog>
@@ -261,7 +261,7 @@ export default function CurrentTickets() {
                         <div className="overflow-x-auto">
                             <div className="min-w-[1200px]">
                                 <div className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
-                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(tickets.map(t => t.id)); } else { setSelectedTickets([]); } }}/></div>
+                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(groupTickets.map(t => t.id)); } else { setSelectedTickets(prev => prev.filter(id => !groupTickets.some(t => t.id === id))); } }}/></div>
                                     <div className="p-2 border-l border-border">Ticket</div>
                                     <div className="p-2 border-l border-border">Employee</div>
                                     <div className="p-2 border-l border-border text-center">Agent</div>
