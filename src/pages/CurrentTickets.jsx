@@ -83,8 +83,7 @@ export default function CurrentTickets() {
 
         if (ticketsResult.status === 'fulfilled' && ticketsResult.value.ok) {
             const data = await ticketsResult.value.json();
-            const results = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
-            setTickets(results);
+            setTickets(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
         } else {
             console.error("Failed to fetch tickets:", ticketsResult.reason || ticketsResult.value?.statusText);
             setError("Failed to load tickets. Please try again later.");
@@ -92,16 +91,14 @@ export default function CurrentTickets() {
 
         if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
             const data = await usersResult.value.json();
-            const results = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
-            setAllEmployees(results);
+            setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
         } else {
             console.error("Failed to fetch users:", usersResult.reason || usersResult.value?.statusText);
         }
 
         if (statusLabelsResult.status === 'fulfilled' && statusLabelsResult.value.ok) {
             const data = await statusLabelsResult.value.json();
-            const results = Array.isArray(data) ? data : (Array.isArray(data.results) ? data.results : []);
-            setStatusLabels(results);
+            setStatusLabels(Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : []);
         } else {
             console.error("Failed to fetch status labels:", statusLabelsResult.reason || statusLabelsResult.value?.statusText);
         }
@@ -204,17 +201,32 @@ export default function CurrentTickets() {
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
-        tickets.forEach(ticket => {
-            const statusName = ticket.status?.name?.toLowerCase();
-            if (!ticket.agent) { groups['Unassigned Tickets'].push(ticket); } 
-            else if (statusName === 'awaiting customer') { groups['Waiting for Response'].push(ticket); } 
-            else if (statusName === 'resolved' || statusName === 'closed') { groups['Resolved Tickets'].push(ticket); } 
-            else { groups['Open Tickets'].push(ticket); }
-        });
+        if (Array.isArray(tickets)) {
+            tickets.forEach(ticket => {
+                const statusName = ticket.status?.name?.toLowerCase();
+                if (!ticket.agent) { groups['Unassigned Tickets'].push(ticket); } 
+                else if (statusName === 'awaiting customer') { groups['Waiting for Response'].push(ticket); } 
+                else if (statusName === 'resolved' || statusName === 'closed') { groups['Resolved Tickets'].push(ticket); } 
+                else { groups['Open Tickets'].push(ticket); }
+            });
+        }
         return groups;
     }, [tickets]);
 
-    const itStaff = useMemo(() => allEmployees.filter(emp => (emp.groups?.some(g => g.name === 'IT Staff')) || emp.is_superuser), [allEmployees]);
+    const itStaff = useMemo(() => {
+        return allEmployees.filter(emp => {
+            const hasITGroup = emp.groups?.some(group => {
+                if (typeof group === 'object' && group !== null && group.name) {
+                    return group.name === 'IT Staff';
+                }
+                if (typeof group === 'string') {
+                    return group === 'IT Staff';
+                }
+                return false;
+            });
+            return hasITGroup || emp.is_superuser;
+        });
+    }, [allEmployees]);
     
     const filteredStaff = itStaff.filter(staff => {
         const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
@@ -241,7 +253,7 @@ export default function CurrentTickets() {
     if (error) return <p className="p-4 text-red-500">{error}</p>;
 
     return (
-        <div className="space-y-8 p-4 md:p-6">
+        <div className="space-y-8">
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
                 Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
             </ConfirmationDialog>
@@ -261,7 +273,7 @@ export default function CurrentTickets() {
                         <div className="overflow-x-auto">
                             <div className="min-w-[1200px]">
                                 <div className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
-                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(groupTickets.map(t => t.id)); } else { setSelectedTickets(prev => prev.filter(id => !groupTickets.some(t => t.id === id))); } }}/></div>
+                                    <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(prev => [...new Set([...prev, ...groupTickets.map(t => t.id)])]); } else { setSelectedTickets(prev => prev.filter(id => !groupTickets.some(t => t.id === id))); } }}/></div>
                                     <div className="p-2 border-l border-border">Ticket</div>
                                     <div className="p-2 border-l border-border">Employee</div>
                                     <div className="p-2 border-l border-border text-center">Agent</div>
