@@ -240,8 +240,19 @@ export default function CurrentTickets() {
 
     const getAgentInitials = (agentId) => {
         if (!agentId) return <FaUserPlus />;
+    
         const agent = allEmployees.find(emp => emp.id === agentId);
-        if (!agent) return <FaUserPlus />;
+    
+        // If an agent ID exists but the agent isn't found, log an error to the console
+        if (!agent) {
+            console.error(
+                `DEBUG: Could not find agent with ID: ${agentId}. This usually means the 'allEmployees' list is missing this user or there is a data type mismatch (e.g., string vs. number).`,
+                {
+                    allEmployeeIds: allEmployees.map(e => e.id)
+                }
+            );
+            return <FaUserPlus />;
+        }
     
         const firstInitial = agent.first_name ? agent.first_name[0] : '';
         const lastInitial = agent.last_name ? agent.last_name[0] : '';
