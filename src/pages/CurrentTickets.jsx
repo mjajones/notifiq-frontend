@@ -10,6 +10,7 @@ import EditLabelsModal from '../components/ui/EditLabelsModal.jsx';
 
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
+
     useEffect(() => {
         const dropdownEl = dropdownRef.current;
         if (!dropdownEl || !targetRect) return;
@@ -23,6 +24,7 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         dropdownEl.style.left = `${targetRect.left}px`;
         dropdownEl.style.width = `${targetRect.width < 256 ? 256 : targetRect.width}px`;
     }, [targetRect]);
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) onClose();
@@ -30,6 +32,7 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [onClose]);
+
     return createPortal(
         <div ref={dropdownRef} className="fixed z-50 text-left">
             <div className="w-full bg-white border border-border rounded-md shadow-lg">
@@ -117,17 +120,21 @@ export default function CurrentTickets() {
         initialLoad();
     }, [fetchTickets, fetchStatusLabels, authTokens, isUpdating]);
 
-    const handleTicketUpdate = async (ticketId, field, value) => {
+    const handleTicketUpdate = async (ticket, field, value) => {
+        if (!ticket || !ticket.id) {
+            console.error("handleTicketUpdate called with invalid ticket object", ticket);
+            return;
+        }
         setIsUpdating(true);
         setAssigningTicket(null);
         try {
             const formData = new FormData();
             formData.append(field, value);
-            if (field === 'agent' && value) {
+            if (field === 'agent' && value && !ticket.agent) {
                 const openStatus = statusLabels.find(s => s.name.toLowerCase() === 'open');
                 if (openStatus) formData.append('status_id', openStatus.id);
             }
-            await fetch(`${API_URL}/api/incidents/${ticketId}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
+            await fetch(`${API_URL}/api/incidents/${ticket.id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
             await fetchTickets();
         } catch (err) { console.error('Failed to update ticket:', err); } 
         finally { setIsUpdating(false); }
@@ -138,33 +145,24 @@ export default function CurrentTickets() {
     const handleBulkMove = async (groupName) => {
         setIsUpdating(true);
         setIsMoveMenuOpen(false);
-        
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
             let statusToApply;
-            let statusNameToFind = '';
-
             switch (groupName) {
                 case 'Unassigned Tickets': formData.append('agent', ''); break;
-                case 'Open Tickets': statusNameToFind = 'open'; break;
-                case 'Waiting for Response': statusNameToFind = 'awaiting customer'; break;
-                case 'Resolved Tickets': statusNameToFind = 'resolved'; break;
+                case 'Open Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open'); break;
+                case 'Waiting for Response': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer'); break;
+                case 'Resolved Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved'); break;
                 default: return null;
             }
-
-            if (statusNameToFind) {
-                statusToApply = statusLabels.find(l => l.name.toLowerCase() === statusNameToFind);
-                console.log(`For group "${groupName}", found status object:`, statusToApply);
-                if (statusToApply) {
-                    formData.append('status_id', statusToApply.id);
-                } else {
-                    console.error(`Could not find a status label named "${statusNameToFind}"`);
-                }
+            if (statusToApply) {
+                formData.append('status_id', statusToApply.id);
+            } else if (groupName !== 'Unassigned Tickets') {
+                console.error(`Could not find a status label for group "${groupName}"`);
+                return null;
             }
-
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
-        
         await Promise.all(updates);
         await fetchTickets();
         setSelectedTickets([]);
@@ -194,7 +192,8 @@ export default function CurrentTickets() {
     const handleDuplicateSelected = async () => {
         setIsUpdating(true);
         const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
-        try { await Promise.all(duplicatePromises); } catch (err) { console.error("Failed to duplicate tickets:", err); } 
+        try { await Promise.all(duplicatePromises); } 
+        catch (err) { console.error("Failed to duplicate tickets:", err); } 
         finally { await fetchTickets(); setSelectedTickets([]); setIsUpdating(false); }
     };
 
@@ -202,7 +201,8 @@ export default function CurrentTickets() {
         setIsConfirmingDelete(false);
         setIsUpdating(true);
         const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
-        try { await Promise.all(deletePromises); } catch (err) { console.error("Failed to delete tickets:", err); } 
+        try { await Promise.all(deletePromises); } 
+        catch (err) { console.error("Failed to delete tickets:", err); } 
         finally { await fetchTickets(); setSelectedTickets([]); setIsUpdating(false); }
     };
 
@@ -215,15 +215,10 @@ export default function CurrentTickets() {
         if (Array.isArray(tickets)) {
             tickets.forEach(ticket => {
                 const statusName = ticket.status?.name?.toLowerCase();
-                if (!ticket.agent) {
-                    groups['Unassigned Tickets'].push(ticket);
-                } else if (statusName === 'awaiting customer') {
-                    groups['Waiting for Response'].push(ticket);
-                } else if (statusName === 'resolved') {
-                    groups['Resolved Tickets'].push(ticket);
-                } else {
-                    groups['Open Tickets'].push(ticket);
-                }
+                if (!ticket.agent) { groups['Unassigned Tickets'].push(ticket); } 
+                else if (statusName === 'awaiting customer') { groups['Waiting for Response'].push(ticket); } 
+                else if (statusName === 'resolved') { groups['Resolved Tickets'].push(ticket); } 
+                else { groups['Open Tickets'].push(ticket); }
             });
         }
         return groups;
@@ -236,22 +231,18 @@ export default function CurrentTickets() {
     
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
-    if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
-    if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
-
     const getAgentInitials = (agentId) => {
         if (!agentId) return <FaUserPlus />;
         const agent = allEmployees.find(emp => emp.id === agentId);
         if (!agent) return <FaUserPlus />;
-        
         const firstInitial = agent.first_name?.[0] || '';
         const lastInitial = agent.last_name?.[0] || '';
-
-        if (firstInitial && lastInitial) {
-            return `${firstInitial}${lastInitial}`.toUpperCase();
-        }
+        if (firstInitial && lastInitial) return `${firstInitial}${lastInitial}`.toUpperCase();
         return (agent.username?.substring(0, 2) || 'N/A').toUpperCase();
     };
+
+    if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
+    if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
 
     return (
         <div className="space-y-8">
@@ -285,13 +276,14 @@ export default function CurrentTickets() {
                                 </div>
                                 <div>
                                     {groupTickets.map(ticket => {
+                                        const agentInfo = allEmployees.find(staff => staff.id === ticket.agent);
                                         const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, color: s.color }));
                                         return (
                                             <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
                                                 <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
                                                 <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
                                                 <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter or search employee" list="employee-list"/></div>
-                                                <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={allEmployees.find(emp => emp.id === ticket.agent)?.first_name || 'Assign Agent'}>
+                                                <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
                                                     {getAgentInitials(ticket.agent)}</button>
                                                 </div>
                                                 <div className="p-2 border-l border-border"><StatusSelector options={statusAsOptions} value={ticket.status?.id} onChange={(newValue) => handleTicketUpdate(ticket, 'status_id', newValue)} onEditLabels={() => setIsEditLabelsModalOpen(true)} /></div>
