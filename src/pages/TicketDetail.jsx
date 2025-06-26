@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react'; // --- CORRECTED: useMemo has been added here ---
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext.jsx';
 import { FiUser, FiPaperclip, FiSmile } from 'react-icons/fi';
@@ -29,7 +29,7 @@ const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
     }, [authTokens]);
 
     return (
-        <div className="bg-foreground rounded-lg border border-border p-4 space-y-6">
+        <div className="bg-foreground rounded-lg border border-border p-4 space-y-6 shadow-sm">
             <div>
                 <label className="text-sm font-medium text-text-secondary">Requester</label>
                 <p className="text-text-primary font-semibold">{ticket.requester_name || 'N/A'}</p>
@@ -90,32 +90,13 @@ const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
     );
 };
 
-// --- Sub-component for the Right Panel (User Info) ---
-const RequesterInfoPanel = ({ ticket }) => {
-    const [interactionHistory, setInteractionHistory] = useState([]);
-    const { authTokens } = useContext(AuthContext);
-
-    useEffect(() => {
-        if (!ticket.requester_email) return;
-        const fetchHistory = async () => {
-            if (!authTokens) return;
-            try {
-                const response = await fetch(`${API_URL}/api/incidents/?requester_email=${ticket.requester_email}`, {
-                     headers: { 'Authorization': `Bearer ${authTokens.access}` }
-                });
-                const data = await response.json();
-                const history = (Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []).filter(t => t.id !== ticket.id);
-                setInteractionHistory(history);
-            } catch(e) {
-                console.error("Could not fetch interaction history", e);
-            }
-        };
-        fetchHistory();
-    }, [ticket.requester_email, ticket.id, authTokens]);
+// --- Sub-component for the Right Panel (User Info & History) ---
+const ContextPanel = ({ ticket }) => {
+    const ticketHistory = ticket.activity_log || [];
 
     return (
         <div className="space-y-6">
-            <div className="bg-foreground rounded-lg border border-border p-4">
+            <div className="bg-foreground rounded-lg border border-border p-4 shadow-sm">
                 <h3 className="font-semibold text-text-primary">{ticket.requester_name}</h3>
                 <a href={`mailto:${ticket.requester_email}`} className="text-sm text-primary hover:underline">{ticket.requester_email}</a>
                 <div className="mt-4 text-sm space-y-1">
@@ -127,16 +108,18 @@ const RequesterInfoPanel = ({ ticket }) => {
                      <textarea placeholder="Add user notes..." rows="3" className="w-full mt-1 p-2 border border-border rounded-md bg-background"></textarea>
                 </div>
             </div>
-            <div className="bg-foreground rounded-lg border border-border p-4">
+            <div className="bg-foreground rounded-lg border border-border p-4 shadow-sm">
                 <h3 className="font-semibold text-text-primary mb-3">Interaction History</h3>
                 <ul className="space-y-3">
-                    {interactionHistory.length > 0 ? interactionHistory.map(item => (
+                    {ticketHistory.length > 0 ? ticketHistory.map(item => (
                         <li key={item.id}>
-                            <Link to={`/tickets/${item.id}`} className="text-sm text-primary hover:underline font-medium">{item.title}</Link>
-                            <p className="text-xs text-text-secondary">{new Date(item.submitted_at).toLocaleDateString()} - {item.status.name}</p>
+                            <p className="text-sm text-text-primary font-medium">{item.activity_type}</p>
+                            <p className="text-xs text-text-secondary">
+                                {new Date(item.timestamp).toLocaleString()} by {item.user}
+                            </p>
                         </li>
                     )) : (
-                        <p className="text-sm text-text-secondary">No other tickets found for this user.</p>
+                        <p className="text-sm text-text-secondary">No activity recorded for this ticket.</p>
                     )}
                 </ul>
             </div>
@@ -179,12 +162,11 @@ export default function TicketDetail() {
         formData.append(field, value);
 
         try {
-            const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
+            await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${authTokens.access}` },
                 body: formData
             });
-            if (!response.ok) throw new Error('Failed to update ticket.');
             await fetchTicketDetails();
         } catch (error) {
             console.error("Update failed:", error);
@@ -193,24 +175,24 @@ export default function TicketDetail() {
 
     const handleAddReply = async () => {
         if (replyContent.trim() === '') return;
-        
         await handleUpdateTicket('internal_note', replyContent.replace(/<[^>]*>/g, ''));
         setReplyContent('');
     };
-    
+
+    // Filter the activity log to create a clean conversation view
     const conversation = useMemo(() => {
         if (!ticket) return [];
-        const combined = [];
-        combined.push({
-            id: `initial-${ticket.id}`,
-            user: ticket.requester_name,
-            timestamp: ticket.submitted_at,
-            isDescription: true,
-            note: ticket.description
-        });
-        if (ticket.activity_log) {
-            combined.push(...ticket.activity_log);
-        }
+        const combined = [
+            // Add the original ticket description as the first item
+            {
+                id: `initial-${ticket.id}`,
+                user: ticket.requester_name,
+                timestamp: ticket.submitted_at,
+                note: ticket.description
+            },
+            // Filter activity log to only include 'Note Added' items
+            ...(ticket.activity_log || []).filter(item => item.activity_type === 'Note Added')
+        ];
         return combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }, [ticket]);
 
@@ -219,24 +201,25 @@ export default function TicketDetail() {
     if (!ticket) return <p className="p-8">Ticket not found.</p>;
 
     return (
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-4 md:p-6 lg:p-8 bg-gray-50 min-h-full">
             <div className="mb-4">
+                <Link to="/tickets" className="text-sm text-primary hover:underline mb-2 block">&larr; Back to All Tickets</Link>
                 <h2 className="text-2xl font-bold text-text-primary">{ticket.title}</h2>
-                <p className="text-sm text-text-secondary">
-                    Ticket #{ticket.id}
-                </p>
+                <p className="text-sm text-text-secondary">Ticket #{ticket.id}</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
+                {/* --- Left Column --- */}
                 <div className="lg:col-span-3">
                     <TicketPropertiesPanel ticket={ticket} onUpdate={handleUpdateTicket} />
                 </div>
 
-                <div className="lg:col-span-6">
-                    <div className="space-y-6">
-                        {conversation.map(item => (
-                            <div key={item.id} className="flex gap-4">
+                {/* --- Middle Column (Conversation) --- */}
+                <div className="lg:col-span-6 bg-foreground border border-border rounded-lg shadow-sm">
+                    <div className="p-6 space-y-6">
+                        {conversation.map((item, index) => (
+                            <div key={item.id} className={`flex gap-4 ${index !== 0 ? 'pt-6 border-t border-border' : ''}`}>
                                 <div className="bg-gray-200 rounded-full h-10 w-10 flex-shrink-0 flex items-center justify-center">
                                     <FiUser size={20} />
                                 </div>
@@ -245,57 +228,34 @@ export default function TicketDetail() {
                                         <p className="font-semibold text-text-primary">{item.user || 'System'}</p>
                                         <p className="text-xs text-text-secondary">{new Date(item.timestamp).toLocaleString()}</p>
                                     </div>
-                                    <div className="prose prose-sm max-w-none text-text-primary mt-1">
-                                        {item.isDescription ? (
-                                            <p>{item.note}</p>
-                                        ) : item.activity_type === 'Note Added' ? (
-                                            <p>{item.note}</p>
-                                        ) : (
-                                            <p className="text-sm text-text-secondary italic">
-                                                Changed {item.activity_type.split(' ')[0]} from '{item.old_value || 'None'}' to '{item.new_value || 'None'}'
-                                            </p>
-                                        )}
-                                    </div>
+                                    <div className="prose prose-sm max-w-none text-text-primary mt-1" dangerouslySetInnerHTML={{ __html: item.note }} />
                                 </div>
                             </div>
                         ))}
                     </div>
                     
-                    <div className="mt-8">
-                         <h3 className="font-semibold mb-2">Public Reply</h3>
-                         <div className="bg-foreground rounded-lg border border-border">
-                            <ReactQuill 
-                                theme="snow" 
-                                value={replyContent} 
-                                onChange={setReplyContent}
-                                modules={{
-                                    toolbar: [
-                                        [{ 'header': [1, 2, false] }],
-                                        ['bold', 'italic', 'underline','strike', 'blockquote'],
-                                        [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-                                        ['link'],
-                                        ['clean']
-                                    ],
-                                }}
-                            />
-                            <div className="p-2 flex justify-between items-center bg-gray-50/50">
-                                <div className="flex items-center gap-2">
-                                    <button className="p-2 text-text-secondary hover:bg-gray-200 rounded-md"><FiPaperclip /></button>
-                                    <button className="p-2 text-text-secondary hover:bg-gray-200 rounded-md"><FiSmile /></button>
-                                </div>
-                                <button
-                                    onClick={handleAddReply}
-                                    className="bg-primary text-white font-semibold py-2 px-6 rounded-md hover:bg-primary-hover"
-                                >
-                                    Submit
-                                </button>
-                            </div>
-                         </div>
+                    <div className="p-4 border-t border-border">
+                         <ReactQuill 
+                            theme="snow" 
+                            value={replyContent} 
+                            onChange={setReplyContent}
+                            placeholder="Type your reply here..."
+                            className="h-48 mb-12" // Increased height
+                         />
+                        <div className="pt-2 flex justify-end items-center">
+                            <button
+                                onClick={handleAddReply}
+                                className="bg-primary text-white font-semibold py-2 px-6 rounded-md hover:bg-primary-hover"
+                            >
+                                Submit
+                            </button>
+                        </div>
                     </div>
                 </div>
 
+                {/* --- Right Column --- */}
                 <div className="lg:col-span-3">
-                    <RequesterInfoPanel ticket={ticket} />
+                    <ContextPanel ticket={ticket} />
                 </div>
             </div>
         </div>

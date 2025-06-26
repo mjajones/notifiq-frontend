@@ -214,6 +214,7 @@ export default function CurrentTickets() {
     }, [tickets]);
 
     const itStaff = useMemo(() => {
+        console.log("All employees from API", allEmployees);
         return allEmployees.filter(emp => {
             const hasITGroup = emp.groups?.some(group => {
                 if (typeof group === 'object' && group !== null && group.name === 'IT Staff') {
@@ -254,7 +255,7 @@ export default function CurrentTickets() {
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
     if (error) return <p className="p-4 text-red-500">{error}</p>;
-
+    console.log("Filtered IT staff for dropdown:", filteredStaff);
     return (
         <div className="space-y-8">
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
