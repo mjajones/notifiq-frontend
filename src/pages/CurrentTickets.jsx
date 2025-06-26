@@ -284,8 +284,9 @@ export default function CurrentTickets() {
                     <div className="bg-foreground rounded-lg border border-border shadow-sm text-sm">
                         <div className="overflow-x-auto">
                             <div className="min-w-[1200px]">
-                                <div className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
+                                <div className="grid grid-cols-[auto_1fr_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] text-xs font-semibold text-text-secondary border-b border-border">
                                     <div className="p-2 pl-4 w-12"><input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" onChange={(e) => { if (e.target.checked) { setSelectedTickets(prev => [...new Set([...prev, ...groupTickets.map(t => t.id)])]); } else { setSelectedTickets(prev => prev.filter(id => !groupTickets.some(t => t.id === id))); } }}/></div>
+                                    <div className="p-2 border-l border-border">ID</div>
                                     <div className="p-2 border-l border-border">Ticket</div>
                                     <div className="p-2 border-l border-border">Employee</div>
                                     <div className="p-2 border-l border-border text-center">Agent</div>
@@ -299,8 +300,9 @@ export default function CurrentTickets() {
                                         const agentInfo = allEmployees.find(staff => staff.id === ticket.agent?.id);
                                         const statusAsOptions = statusLabels.map(s => ({ value: s.id, label: s.name, color: s.color }));
                                         return (
-                                            <div key={ticket.id} className="grid grid-cols-[auto_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
+                                            <div key={ticket.id} className="grid grid-cols-[auto_1fr_3fr_2fr_1fr_1.5fr_1.5fr_1fr_1.5fr] items-center border-t border-border hover:bg-gray-50/50">
                                                 <div className="p-2 pl-4 text-center"><input type="checkbox" checked={selectedTickets.includes(ticket.id)} onChange={() => handleSelectTicket(ticket.id)} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" /></div>
+                                                <div className="p-2 border-l border-border font-medium text-gray-400">{ticket.id}</div>
                                                 <div className="p-2 border-l border-border font-medium text-text-primary"><Link to={`/tickets/${ticket.id}`} className="hover:underline">{ticket.title}</Link></div>
                                                 <div className="p-2 border-l border-border"><input type="text" defaultValue={ticket.requester_name} onBlur={(e) => handleTicketUpdate(ticket.id, 'requester_name', e.target.value)} className="w-full bg-transparent p-1 -ml-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Enter or search employee" list="employee-list"/></div>
                                                 <div className="p-2 border-l border-border flex items-center justify-center"><button onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setAssigningTicket({ id: ticket.id, rect: rect }); setAgentSearchTerm(""); }} className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold hover:bg-primary hover:text-white transition-colors" title={agentInfo ? `${agentInfo.first_name} ${agentInfo.last_name}`.trim() || agentInfo.username : "Assign Agent"}>
