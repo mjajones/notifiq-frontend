@@ -85,22 +85,17 @@ export default function CurrentTickets() {
             const data = await ticketsResult.value.json();
             setTickets(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
         } else {
-            console.error("Failed to fetch tickets:", ticketsResult.reason || ticketsResult.value?.statusText);
             setError("Failed to load tickets. Please try again later.");
         }
 
         if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
             const data = await usersResult.value.json();
             setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
-        } else {
-            console.error("Failed to fetch users:", usersResult.reason || usersResult.value?.statusText);
         }
 
         if (statusLabelsResult.status === 'fulfilled' && statusLabelsResult.value.ok) {
             const data = await statusLabelsResult.value.json();
             setStatusLabels(Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : []);
-        } else {
-            console.error("Failed to fetch status labels:", statusLabelsResult.reason || statusLabelsResult.value?.statusText);
         }
 
         setLoading(false);
@@ -124,8 +119,6 @@ export default function CurrentTickets() {
 
             if(response.ok) {
                 await fetchData();
-            } else {
-                console.error("Failed to update ticket on the server.");
             }
         } catch (err) {
             console.error('An error occurred while updating the ticket:', err);
@@ -214,13 +207,9 @@ export default function CurrentTickets() {
     }, [tickets]);
 
     const itStaff = useMemo(() => {
-        console.log("All employees from API", allEmployees);
         return allEmployees.filter(emp => {
             const hasITGroup = emp.groups?.some(group => {
-                if (typeof group === 'object' && group !== null && group.name === 'IT Staff') {
-                    return true;
-                }
-                return false;
+                return typeof group === 'object' && group !== null && group.name === 'IT Staff';
             });
             return hasITGroup || emp.is_superuser;
         });
@@ -235,14 +224,9 @@ export default function CurrentTickets() {
 
     const getAgentInitials = (agentData) => {
         const agentId = (typeof agentData === 'object' && agentData !== null) ? agentData.id : agentData;
-    
         if (!agentId) return <FaUserPlus />;
-    
         const agent = allEmployees.find(emp => emp.id === agentId);
-    
-        if (!agent) {
-            return <FaUserPlus />;
-        }
+        if (!agent) return <FaUserPlus />;
     
         const firstInitial = agent.first_name ? agent.first_name[0] : '';
         const lastInitial = agent.last_name ? agent.last_name[0] : '';
@@ -255,7 +239,7 @@ export default function CurrentTickets() {
 
     if (loading) return <p className="p-4 text-text-secondary">Loading tickets...</p>;
     if (error) return <p className="p-4 text-red-500">{error}</p>;
-    console.log("Filtered IT staff for dropdown:", filteredStaff);
+
     return (
         <div className="space-y-8">
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
