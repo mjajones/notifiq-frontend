@@ -107,6 +107,9 @@ export default function CurrentTickets() {
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         setAssigningTicket(null);
+        // Log 1: Confirm the function is called with the correct data
+        console.log(`Attempting to update ticket ${ticketId}, setting ${field} to:`, value);
+
         try {
             const formData = new FormData();
             formData.append(field, value);
@@ -117,11 +120,19 @@ export default function CurrentTickets() {
                 body: formData
             });
 
-            if(response.ok) {
+            // Log 2: Show the status of the backend request
+            console.log(`Backend response status: ${response.status}`);
+
+            if (response.ok) {
+                console.log("Update successful, re-fetching data...");
                 await fetchData();
+            } else {
+                // Log 3: If the update failed, show the error from the backend
+                const errorData = await response.json();
+                console.error("Failed to update ticket. Backend error:", errorData);
             }
         } catch (err) {
-            console.error('An error occurred while updating the ticket:', err);
+            console.error('A client-side error occurred while updating the ticket:', err);
         }
     };
     
