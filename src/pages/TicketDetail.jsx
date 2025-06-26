@@ -66,7 +66,7 @@ const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
                     onChange={(e) => onUpdate('category', e.target.value)}
                     className="w-full mt-1 p-2 border border-border rounded-md bg-foreground"
                 >
-                    <option value="Hardware">Hardware</option>
+                    <option value="Hardware">Hardwaree</option>
                     <option value="Software">Software</option>
                     <option value="Network">Network</option>
                     <option value="Office Applications">Office Applications</option>
@@ -90,7 +90,7 @@ const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
     );
 };
 
-// --- Sub-component for the Right Panel (User Info) ---
+// --- Sub-component Right Panel (User Info) ---
 const RequesterInfoPanel = ({ ticket }) => {
     const [interactionHistory, setInteractionHistory] = useState([]);
     const { authTokens } = useContext(AuthContext);
