@@ -122,8 +122,12 @@ export default function CurrentTickets() {
             });
 
             if (response.ok) {
-                // Re-fetch all data to ensure the UI is in sync. This is the most reliable method.
-                await fetchData();
+                const updatedTicket = await response.json();
+                setTickets(prevTickets =>
+                    prevTickets.map(ticket =>
+                        ticket.id === updatedTicket.id ? updatedTicket : ticket
+                    )
+                );
             } else {
                 console.error("Failed to update ticket. Backend responded with an error.");
             }
