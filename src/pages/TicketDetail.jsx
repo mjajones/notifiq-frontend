@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import AuthContext from '../context/AuthContext';
-import { FiMail, FiUser, FiInfo, FiEdit2, FiTag, FiList, FiPaperclip, FiLink, FiSmile } from 'react-icons/fi';
+import AuthContext from '../context/AuthContext.jsx';
+import { FiUser, FiPaperclip, FiSmile } from 'react-icons/fi';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// Sub-component for Left Panel (Ticket Properties)
+// --- Sub-component for the Left Panel (Ticket Properties) ---
 const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
     const [itStaff, setItStaff] = useState([]);
     const { authTokens } = useContext(AuthContext);
 
     useEffect(() => {
         const fetchITStaff = async () => {
+            if (!authTokens) return;
             try {
                 const response = await fetch(`${API_URL}/api/users/?groups__name=IT Staff`, {
                     headers: { 'Authorization': `Bearer ${authTokens.access}` }
@@ -89,7 +90,7 @@ const TicketPropertiesPanel = ({ ticket, onUpdate }) => {
     );
 };
 
-// Sub-component for Right Panel (User Info)
+// --- Sub-component for the Right Panel (User Info) ---
 const RequesterInfoPanel = ({ ticket }) => {
     const [interactionHistory, setInteractionHistory] = useState([]);
     const { authTokens } = useContext(AuthContext);
@@ -97,6 +98,7 @@ const RequesterInfoPanel = ({ ticket }) => {
     useEffect(() => {
         if (!ticket.requester_email) return;
         const fetchHistory = async () => {
+            if (!authTokens) return;
             try {
                 const response = await fetch(`${API_URL}/api/incidents/?requester_email=${ticket.requester_email}`, {
                      headers: { 'Authorization': `Bearer ${authTokens.access}` }
@@ -142,7 +144,7 @@ const RequesterInfoPanel = ({ ticket }) => {
     );
 }
 
-// Main Ticket Detail Component
+// --- Main Ticket Detail Component ---
 export default function TicketDetail() {
     const { ticketId } = useParams();
     const { authTokens } = useContext(AuthContext);
@@ -192,15 +194,13 @@ export default function TicketDetail() {
     const handleAddReply = async () => {
         if (replyContent.trim() === '') return;
         
-        await handleUpdateTicket('internal_note', replyContent.replace(/<[^>]*>/g, '')); // Strip HTML for now
+        await handleUpdateTicket('internal_note', replyContent.replace(/<[^>]*>/g, ''));
         setReplyContent('');
     };
     
-    // Combine original description and activity log for conversation view
     const conversation = useMemo(() => {
         if (!ticket) return [];
         const combined = [];
-        // Add the original ticket description as the first item
         combined.push({
             id: `initial-${ticket.id}`,
             user: ticket.requester_name,
@@ -208,11 +208,9 @@ export default function TicketDetail() {
             isDescription: true,
             note: ticket.description
         });
-        // Add activity log items
         if (ticket.activity_log) {
             combined.push(...ticket.activity_log);
         }
-        // Sort by timestamp
         return combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }, [ticket]);
 
@@ -231,12 +229,10 @@ export default function TicketDetail() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/*Left Column*/}
                 <div className="lg:col-span-3">
                     <TicketPropertiesPanel ticket={ticket} onUpdate={handleUpdateTicket} />
                 </div>
 
-                {/*Middle Column (Conversation)*/}
                 <div className="lg:col-span-6">
                     <div className="space-y-6">
                         {conversation.map(item => (
@@ -298,7 +294,6 @@ export default function TicketDetail() {
                     </div>
                 </div>
 
-                {/*Right Column*/}
                 <div className="lg:col-span-3">
                     <RequesterInfoPanel ticket={ticket} />
                 </div>
