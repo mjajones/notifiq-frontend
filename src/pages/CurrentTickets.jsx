@@ -75,30 +75,34 @@ export default function CurrentTickets() {
         setLoading(true);
         setError(null);
 
-        const [ticketsResult, usersResult, statusLabelsResult] = await Promise.allSettled([
-            fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-            fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
-            fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
-        ]);
+        try {
+            const [ticketsRes, usersRes, statusLabelsRes] = await Promise.all([
+                fetch(`${API_URL}/api/incidents/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
+                fetch(`${API_URL}/api/users/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } }),
+                fetch(`${API_URL}/api/status-labels/`, { headers: { 'Authorization': `Bearer ${authTokens.access}` } })
+            ]);
 
-        if (ticketsResult.status === 'fulfilled' && ticketsResult.value.ok) {
-            const data = await ticketsResult.value.json();
-            setTickets(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
-        } else {
-            setError("Failed to load tickets. Please try again later.");
+            if (ticketsRes.ok) {
+                const data = await ticketsRes.json();
+                setTickets(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
+            } else {
+                setError("Failed to load tickets.");
+            }
+
+            if (usersRes.ok) {
+                const data = await usersRes.json();
+                setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
+            }
+
+            if (statusLabelsRes.ok) {
+                const data = await statusLabelsRes.json();
+                setStatusLabels(Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : []);
+            }
+        } catch (err) {
+            setError("An error occurred while fetching data.");
+        } finally {
+            setLoading(false);
         }
-
-        if (usersResult.status === 'fulfilled' && usersResult.value.ok) {
-            const data = await usersResult.value.json();
-            setAllEmployees(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
-        }
-
-        if (statusLabelsResult.status === 'fulfilled' && statusLabelsResult.value.ok) {
-            const data = await statusLabelsResult.value.json();
-            setStatusLabels(Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : []);
-        }
-
-        setLoading(false);
     }, [authTokens, API_URL]);
 
     useEffect(() => {
@@ -118,16 +122,10 @@ export default function CurrentTickets() {
             });
 
             if (response.ok) {
-                const updatedTicket = await response.json();
-                
-                setTickets(prevTickets =>
-                    prevTickets.map(ticket =>
-                        ticket.id === updatedTicket.id ? updatedTicket : ticket
-                    )
-                );
+                // Re-fetch all data to ensure the UI is in sync. This is the most reliable method.
+                await fetchData();
             } else {
-                const errorData = await response.json();
-                console.error("Failed to update ticket. Backend error:", errorData);
+                console.error("Failed to update ticket. Backend responded with an error.");
             }
         } catch (err) {
             console.error('A client-side error occurred while updating the ticket:', err);
