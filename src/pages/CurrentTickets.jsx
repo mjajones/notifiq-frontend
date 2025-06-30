@@ -56,6 +56,8 @@ export default function CurrentTickets() {
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [agentSearchTerm, setAgentSearchTerm] = useState("");
     const [isEditLabelsModalOpen, setIsEditLabelsModalOpen] = useState(false);
+    // --- New state to force re-renders ---
+    const [renderKey, setRenderKey] = useState(0);
     
     const { authTokens, user } = useContext(AuthContext);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -70,9 +72,12 @@ export default function CurrentTickets() {
     
     const moveOptions = ['Unassigned Tickets', 'Open Tickets', 'Waiting for Response', 'Resolved Tickets'];
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (isUpdate = false) => {
         if (!authTokens) return;
-        setLoading(true);
+        // Only show full loading screen on initial load
+        if (!isUpdate) {
+            setLoading(true);
+        }
         setError(null);
 
         try {
@@ -101,7 +106,9 @@ export default function CurrentTickets() {
         } catch (err) {
             setError("An error occurred while fetching data.");
         } finally {
-            setLoading(false);
+            if (!isUpdate) {
+                setLoading(false);
+            }
         }
     }, [authTokens, API_URL]);
 
@@ -122,11 +129,11 @@ export default function CurrentTickets() {
             });
 
             if (response.ok) {
-                // After ANY successful update, re-fetch all data to ensure the UI is in sync.
-                await fetchData();
+                // On success, re-fetch data and force a re-render by changing the key
+                await fetchData(true);
+                setRenderKey(prevKey => prevKey + 1);
             } else {
                 console.error("Failed to update ticket. Backend responded with an error.");
-                // Optionally, add a user-facing error message here
             }
         } catch (err) {
             console.error('A client-side error occurred while updating the ticket:', err);
@@ -156,7 +163,8 @@ export default function CurrentTickets() {
         }).filter(Boolean);
         
         await Promise.all(updates);
-        await fetchData();
+        await fetchData(true);
+        setRenderKey(prevKey => prevKey + 1);
         setSelectedTickets([]);
     };
 
@@ -183,7 +191,8 @@ export default function CurrentTickets() {
     const handleDuplicateSelected = async () => {
         const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
         await Promise.all(duplicatePromises);
-        await fetchData();
+        await fetchData(true);
+        setRenderKey(prevKey => prevKey + 1);
         setSelectedTickets([]);
     };
 
@@ -191,13 +200,14 @@ export default function CurrentTickets() {
         setIsConfirmingDelete(false);
         const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
         await Promise.all(deletePromises);
-        await fetchData();
+        await fetchData(true);
+        setRenderKey(prevKey => prevKey + 1);
         setSelectedTickets([]);
     };
 
-    const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
-    const handleLabelUpdate = async (labelId, labelData) => { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
-    const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchData(); } };
+    const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(true); setRenderKey(prevKey => prevKey + 1); };
+    const handleLabelUpdate = async (labelId, labelData) => { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(true); setRenderKey(prevKey => prevKey + 1); };
+    const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchData(true); setRenderKey(prevKey => prevKey + 1); } };
     
     
     const allTicketGroups = useMemo(() => {
@@ -249,7 +259,7 @@ export default function CurrentTickets() {
     if (error) return <p className="p-4 text-red-500">{error}</p>;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8" key={renderKey}>
             <ConfirmationDialog open={isConfirmingDelete} onClose={() => setIsConfirmingDelete(false)} onConfirm={handleDeleteSelected} title="Delete Tickets">
                 Are you sure you want to delete {selectedTickets.length} selected ticket(s)? This action cannot be undone.
             </ConfirmationDialog>
