@@ -113,7 +113,9 @@ export default function Dashboard() {
                 const ticketsData = await ticketsRes.json();
                 const usersData = await usersRes.json();
 
-                setTickets(Array.isArray(ticketsData.results) ? ticketsData.results : []);
+                const fetchedTickets = Array.isArray(ticketsData.results) ? ticketsData.results : [];
+                console.log("[DEBUG] Raw tickets from API:", fetchedTickets);
+                setTickets(fetchedTickets);
                 setEmployees(Array.isArray(usersData.results) ? usersData.results : []);
 
             } catch (err) {
@@ -176,6 +178,10 @@ export default function Dashboard() {
 
     if (loading) return <p className="p-8 text-text-secondary">Loading dashboard...</p>;
     if (error) return <p className="p-8 text-red-500">Error: {error}</p>;
+
+    // --- Add these debug logs before the return statement ---
+    console.log('[DEBUG] Tickets being passed to "All Tickets" list:', allTicketsSorted);
+    console.log('[DEBUG] Tickets being passed to "My New Tickets" list:', myNewTickets);
 
     return (
         <div className="p-4 md:p-6 space-y-6">
