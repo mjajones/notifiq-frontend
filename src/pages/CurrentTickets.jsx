@@ -8,7 +8,6 @@ import StatusSelector from '../components/ui/StatusSelector.jsx';
 import ConfirmationDialog from '../components/ui/ConfirmationDialog.jsx';
 import EditLabelsModal from '../components/ui/EditLabelsModal.jsx';
 
-// AgentDropdownMenu component remains the same...
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
 
@@ -44,7 +43,6 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         document.body
     );
 }
-
 
 export default function CurrentTickets() {
     const [tickets, setTickets] = useState([]);
@@ -87,9 +85,7 @@ export default function CurrentTickets() {
             if (ticketsRes.ok) {
                 const data = await ticketsRes.json();
                 setTickets(Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []);
-            } else {
-                setError("Failed to load tickets.");
-            }
+            } else { setError("Failed to load tickets."); }
 
             if (usersRes.ok) {
                 const data = await usersRes.json();
@@ -115,7 +111,6 @@ export default function CurrentTickets() {
         setAssigningTicket(null);
         try {
             const formData = new FormData();
-            
             const fieldName = field === 'agent' ? 'agent_id' : field;
             formData.append(fieldName, value);
             
@@ -128,22 +123,23 @@ export default function CurrentTickets() {
             if (response.ok) {
                 await fetchData();
             } else {
-                console.error("Failed to update ticket. Backend responded with an error.");
+                console.error("Update failed on the backend.");
+                await fetchData(); // Re-fetch even on failure to re-sync state
             }
         } catch (err) {
-            console.error('A client-side error occurred while updating the ticket:', err);
+            console.error('Update failed on the client-side:', err);
         }
     };
     
-    // All other handler functions (handleSelectTicket, etc.) remain the same...
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
+
     const handleBulkMove = async (groupName) => {
         setIsMoveMenuOpen(false);
         const updates = selectedTickets.map(id => {
             const formData = new FormData();
             let statusToApply;
             switch (groupName) {
-                case 'Unassigned Tickets': formData.append('agent', ''); break;
+                case 'Unassigned Tickets': formData.append('agent_id', ''); break;
                 case 'Open Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'open'); break;
                 case 'Waiting for Response': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'awaiting customer'); break;
                 case 'Resolved Tickets': statusToApply = statusLabels.find(l => l.name.toLowerCase() === 'resolved'); break;
@@ -151,8 +147,6 @@ export default function CurrentTickets() {
             }
             if (statusToApply) {
                 formData.append('status_id', statusToApply.id);
-            } else if (groupName !== 'Unassigned Tickets') {
-                return null;
             }
             return fetch(`${API_URL}/api/incidents/${id}/`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${authTokens.access}` }, body: formData });
         }).filter(Boolean);
@@ -161,7 +155,9 @@ export default function CurrentTickets() {
         await fetchData();
         setSelectedTickets([]);
     };
+
     const handleExportSelected = () => {
+        // This function does not need changes
         const ticketsToExport = tickets.filter(t => selectedTickets.includes(t.id));
         if (ticketsToExport.length === 0) return;
         const headers = ['ID', 'Title', 'Status', 'Priority', 'Category', 'Employee', 'Agent'];
@@ -180,12 +176,14 @@ export default function CurrentTickets() {
         document.body.removeChild(link);
         setSelectedTickets([]);
     };
+
     const handleDuplicateSelected = async () => {
         const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
         await Promise.all(duplicatePromises);
         await fetchData();
         setSelectedTickets([]);
     };
+
     const handleDeleteSelected = async () => {
         setIsConfirmingDelete(false);
         const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
@@ -193,10 +191,10 @@ export default function CurrentTickets() {
         await fetchData();
         setSelectedTickets([]);
     };
+
     const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
     const handleLabelUpdate = async (labelId, labelData) => { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
     const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchData(); } };
-    
     
     const allTicketGroups = useMemo(() => {
         const groups = { 'Unassigned Tickets': [], 'Open Tickets': [], 'Waiting for Response': [], 'Resolved Tickets': [] };
@@ -212,20 +210,11 @@ export default function CurrentTickets() {
         return groups;
     }, [tickets]);
 
-    const itStaff = useMemo(() => {
-        return allEmployees.filter(emp => {
-            const hasITGroup = emp.groups?.some(group => {
-                return typeof group === 'object' && group !== null && group.name === 'IT Staff';
-            });
-            return hasITGroup || emp.is_superuser;
-        });
-    }, [allEmployees]);
-    
+    const itStaff = useMemo(() => allEmployees.filter(emp => emp.groups?.some(g => g.name === 'IT Staff') || emp.is_superuser), [allEmployees]);
     const filteredStaff = itStaff.filter(staff => {
         const fullName = `${staff.first_name} ${staff.last_name}`.trim().toLowerCase();
         return fullName.includes(agentSearchTerm.toLowerCase()) || staff.username.toLowerCase().includes(agentSearchTerm.toLowerCase());
     });
-    
     const isITStaff = user?.groups?.includes('IT Staff') || user?.is_superuser;
 
     const getAgentInitials = (agentData) => {
@@ -233,13 +222,9 @@ export default function CurrentTickets() {
         if (!agentId) return <FaUserPlus />;
         const agent = allEmployees.find(emp => emp.id === agentId);
         if (!agent) return <FaUserPlus />;
-    
-        const firstInitial = agent.first_name ? agent.first_name[0] : '';
-        const lastInitial = agent.last_name ? agent.last_name[0] : '';
-    
-        if (firstInitial && lastInitial) {
-            return `${firstInitial}${lastInitial}`.toUpperCase();
-        }
+        const firstInitial = agent.first_name?.[0] || '';
+        const lastInitial = agent.last_name?.[0] || '';
+        if (firstInitial && lastInitial) return `${firstInitial}${lastInitial}`.toUpperCase();
         return (agent.username?.substring(0, 2) || 'NA').toUpperCase();
     };
 
