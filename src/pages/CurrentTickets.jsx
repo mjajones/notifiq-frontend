@@ -126,12 +126,7 @@ export default function CurrentTickets() {
             });
 
             if (response.ok) {
-                const updatedTicket = await response.json();
-                setTickets(prevTickets =>
-                    prevTickets.map(ticket =>
-                        ticket.id === updatedTicket.id ? updatedTicket : ticket
-                    )
-                );
+                await fetchData();
             } else {
                 console.error("Failed to update ticket. Backend responded with an error.");
             }
