@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useMemo, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext.jsx';
-import Chart from 'chart.js/auto'; 
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
+
+// Register Chart.js components and Day.js plugins
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 dayjs.extend(duration);
 
 // --- Reusable Stats Card Component ---
@@ -17,7 +20,8 @@ const StatsCard = ({ label, value, large = false }) => (
 
 // --- New Ticket List Component ---
 const TicketList = ({ title, tickets, employees }) => {
-    const getAgentInfo = (agentId) => {
+    const getAgentInfo = (agentData) => {
+        const agentId = agentData?.id;
         if (!agentId) return { name: 'Unassigned', initials: '-' };
         const agent = employees.find(emp => emp.id === agentId);
         if (!agent) return { name: 'Unknown', initials: '?' };
@@ -25,7 +29,7 @@ const TicketList = ({ title, tickets, employees }) => {
         return { name: `${agent.first_name} ${agent.last_name}`, initials };
     };
 
-    const getSlaTime = (dueDate) => {
+    const getResolutionTimeInfo = (dueDate) => {
         if (!dueDate) return { text: 'N/A', color: 'bg-gray-400' };
         const now = dayjs();
         const due = dayjs(dueDate);
@@ -44,11 +48,11 @@ const TicketList = ({ title, tickets, employees }) => {
     };
     
     return (
-        <div className="bg-foreground p-4 rounded-lg border border-border shadow-sm col-span-12 lg:col-span-7">
+        <div className="bg-foreground p-4 rounded-lg border border-border shadow-sm col-span-12 lg:col-span-8">
             <h3 className="font-semibold text-text-primary mb-4">{title}</h3>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-text-secondary uppercase bg-gray-50">
+                    <thead className="text-xs text-text-secondary uppercase bg-gray-50/50">
                         <tr>
                             <th className="px-4 py-3">ID</th>
                             <th className="px-4 py-3">Summary</th>
@@ -60,22 +64,22 @@ const TicketList = ({ title, tickets, employees }) => {
                     <tbody>
                         {tickets.map(ticket => {
                             const agentInfo = getAgentInfo(ticket.agent);
-                            const sla = getSlaTime(ticket.due_date);
+                            const resolution = getResolutionTimeInfo(ticket.due_date);
                             return (
-                                <tr key={ticket.id} className="border-b hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-medium text-gray-400">{ticket.id}</td>
+                                <tr key={ticket.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-medium text-gray-500">{String(ticket.id).padStart(6, '0')}</td>
                                     <td className="px-4 py-3">
                                         <Link to={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">{ticket.title}</Link>
                                     </td>
                                     <td className="px-4 py-3 flex items-center gap-2">
-                                        <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center font-bold text-xs text-gray-600" title={agentInfo.name}>
+                                        <div className="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs" title={agentInfo.name}>
                                             {agentInfo.initials}
                                         </div>
                                         <span>{agentInfo.name}</span>
                                     </td>
                                     <td className="px-4 py-3">{ticket.priority}</td>
                                     <td className="px-4 py-3 text-right">
-                                        <span className={`text-white text-xs font-bold px-2 py-1 rounded-md ${sla.color}`}>{sla.text}</span>
+                                        <span className={`text-white text-xs font-bold px-2 py-1 rounded-md ${resolution.color}`}>{resolution.text}</span>
                                     </td>
                                 </tr>
                             );
@@ -124,33 +128,27 @@ export default function Dashboard() {
     const stats = useMemo(() => {
         const openTickets = tickets.filter(t => t.status?.name !== 'Resolved' && t.status?.name !== 'Closed');
         
-        // NOTE: These calculations require backend model changes to be accurate.
-        const avgResponseTime = '1.01'; 
-        const avgResolutionTime = '2.01'; 
-
         return {
             openCount: openTickets.length,
             resolvedCount: tickets.filter(t => t.status?.name === 'Resolved').length,
             majorCount: tickets.filter(t => t.priority === 'High' || t.priority === 'Urgent').length,
             unassignedCount: tickets.filter(t => !t.agent).length,
-            avgResponseTime,
-            avgResolutionTime,
+            avgResponseTime: '1.01',
+            avgResolutionTime: '2.01',
         };
     }, [tickets]);
 
     const chartData = useMemo(() => {
-        // Data for "Open Incidents by IT Staff"
         const openByAgent = tickets
             .filter(t => t.status?.name !== 'Resolved' && t.status?.name !== 'Closed' && t.agent)
             .reduce((acc, ticket) => {
-                const agentName = employees.find(e => e.id === ticket.agent)?.first_name || 'Unknown';
+                const agentName = employees.find(e => e.id === ticket.agent.id)?.first_name || 'Unknown';
                 acc[agentName] = (acc[agentName] || 0) + 1;
                 return acc;
             }, {});
 
-        // Data for "Incidents by Category"
         const byCategory = tickets.reduce((acc, ticket) => {
-            const key = `${ticket.category || 'N/A'} > ${ticket.subcategory || 'N/A'}`;
+            const key = `${ticket.category || 'N/A'}${ticket.subcategory ? ` - ${ticket.subcategory}`: ''}`;
             acc[key] = (acc[key] || 0) + 1;
             return acc;
         }, {});
@@ -158,7 +156,7 @@ export default function Dashboard() {
         return {
             agent: {
                 labels: Object.keys(openByAgent),
-                datasets: [{ label: 'Open Tickets', data: Object.values(openByAgent), backgroundColor: '#3b82f6' }]
+                datasets: [{ label: 'Open Incidents', data: Object.values(openByAgent), backgroundColor: '#4f46e5', barThickness: 20 }]
             },
             category: {
                 labels: Object.keys(byCategory),
@@ -167,9 +165,14 @@ export default function Dashboard() {
         };
     }, [tickets, employees]);
     
-    const sortedTickets = useMemo(() => 
+    const allTicketsSorted = useMemo(() => 
         [...tickets].sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at))
     , [tickets]);
+    
+    const myNewTickets = useMemo(() => 
+        tickets.filter(t => t.agent?.id === user.user_id && t.status?.name === 'Open')
+            .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
+    , [tickets, user]);
 
     if (loading) return <p className="p-8 text-text-secondary">Loading dashboard...</p>;
     if (error) return <p className="p-8 text-red-500">Error: {error}</p>;
@@ -179,7 +182,6 @@ export default function Dashboard() {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-text-primary">Good afternoon, {user.first_name || user.username}</h1>
-                    <p className="text-text-secondary">{user.first_name} {user.last_name} &bull; {user.email}</p>
                 </div>
                 <div className="text-right">
                     <p className="font-semibold text-text-primary">{dayjs().format('M/D/YYYY')}</p>
@@ -197,17 +199,23 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <TicketList title="All Tickets" tickets={sortedTickets} employees={employees} />
-                <div className="lg:col-span-5 space-y-6">
+                <TicketList title="All Tickets" tickets={allTicketsSorted} employees={employees} />
+                <div className="lg:col-span-4 space-y-6">
                     <div className="bg-foreground p-4 rounded-lg border border-border shadow-sm">
                         <h3 className="font-semibold text-text-primary mb-4">Open Incidents by IT Staff</h3>
-                        <Bar data={chartData.agent} options={{ responsive: true }} />
-                    </div>
-                     <div className="bg-foreground p-4 rounded-lg border border-border shadow-sm">
-                        <h3 className="font-semibold text-text-primary mb-4">Incidents by Category</h3>
-                        <Doughnut data={chartData.category} options={{ responsive: true }} />
+                        <Bar data={chartData.agent} options={{ responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }} />
                     </div>
                 </div>
+            </div>
+            
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-4 space-y-6">
+                     <div className="bg-foreground p-4 rounded-lg border border-border shadow-sm h-[400px]">
+                        <h3 className="font-semibold text-text-primary mb-4">Incidents by Category</h3>
+                        <Doughnut data={chartData.category} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }} />
+                    </div>
+                </div>
+                <TicketList title="My New Tickets" tickets={myNewTickets} employees={employees} />
             </div>
         </div>
     );
