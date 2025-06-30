@@ -111,18 +111,6 @@ export default function CurrentTickets() {
 
     const handleTicketUpdate = async (ticketId, field, value) => {
         setAssigningTicket(null);
-        
-        // --- Start of definitive fix ---
-        // Optimistically update the UI first for a snappy user experience.
-        const originalTickets = tickets;
-        const newAgent = allEmployees.find(emp => emp.id === value);
-        
-        setTickets(prevTickets =>
-            prevTickets.map(ticket =>
-                ticket.id === ticketId ? { ...ticket, agent: newAgent } : ticket
-            )
-        );
-
         try {
             const formData = new FormData();
             formData.append(field, value);
@@ -133,20 +121,15 @@ export default function CurrentTickets() {
                 body: formData
             });
 
-            if (!response.ok) {
-                // If the update fails, roll back to the original state and show an error.
-                setTickets(originalTickets);
+            if (response.ok) {
+                // After a successful update, re-fetch all data to ensure the UI is in sync.
+                await fetchData();
+            } else {
                 console.error("Failed to update ticket. Backend responded with an error.");
             }
-            // If it succeeds, the UI is already updated, so we don't need to do anything.
-            // For extra safety, you could re-fetch here, but the optimistic update should be sufficient.
-            // await fetchData(); 
         } catch (err) {
-            // Also roll back on network errors.
-            setTickets(originalTickets);
             console.error('A client-side error occurred while updating the ticket:', err);
         }
-        // --- End of definitive fix ---
     };
     
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
