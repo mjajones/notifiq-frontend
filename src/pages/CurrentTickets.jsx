@@ -115,33 +115,25 @@ export default function CurrentTickets() {
         setAssigningTicket(null);
         try {
             const formData = new FormData();
-            formData.append(field, value);
-
-            console.log(`[DEBUG STEP 1] Sending PATCH for ticket ${ticketId} with ${field}=${value}`);
-
+            
+            const fieldName = field === 'agent' ? 'agent_id' : field;
+            formData.append(fieldName, value);
+            
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${authTokens.access}` },
                 body: formData
             });
-            
-            console.log(`[DEBUG STEP 2] Backend responded with status: ${response.status}`);
 
             if (response.ok) {
-                // This is the updated ticket data straight from the successful PATCH response
-                const updatedTicketFromServer = await response.json();
-                console.log("[DEBUG STEP 3] Received updated ticket from server:", updatedTicketFromServer);
-                console.log("[DEBUG STEP 4] Agent field in response is:", updatedTicketFromServer.agent);
-
-                // Now, update the state and see if it works
+                const updatedTicket = await response.json();
                 setTickets(prevTickets =>
                     prevTickets.map(ticket =>
-                        ticket.id === updatedTicketFromServer.id ? updatedTicketFromServer : ticket
+                        ticket.id === updatedTicket.id ? updatedTicket : ticket
                     )
                 );
             } else {
-                const errorBody = await response.text();
-                console.error("Failed to update ticket. Backend responded with an error.", errorBody);
+                console.error("Failed to update ticket. Backend responded with an error.");
             }
         } catch (err) {
             console.error('A client-side error occurred while updating the ticket:', err);
