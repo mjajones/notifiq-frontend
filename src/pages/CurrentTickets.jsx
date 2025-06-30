@@ -122,10 +122,11 @@ export default function CurrentTickets() {
             });
 
             if (response.ok) {
-                // After a successful update, re-fetch all data to ensure the UI is in sync.
+                // After ANY successful update, re-fetch all data to ensure the UI is in sync.
                 await fetchData();
             } else {
                 console.error("Failed to update ticket. Backend responded with an error.");
+                // Optionally, add a user-facing error message here
             }
         } catch (err) {
             console.error('A client-side error occurred while updating the ticket:', err);
