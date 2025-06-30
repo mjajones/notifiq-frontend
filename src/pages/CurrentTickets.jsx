@@ -8,6 +8,7 @@ import StatusSelector from '../components/ui/StatusSelector.jsx';
 import ConfirmationDialog from '../components/ui/ConfirmationDialog.jsx';
 import EditLabelsModal from '../components/ui/EditLabelsModal.jsx';
 
+// AgentDropdownMenu component remains the same...
 function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm, onSearchChange }) {
     const dropdownRef = useRef(null);
 
@@ -43,6 +44,7 @@ function AgentDropdownMenu({ options, onSelect, onClose, targetRect, searchTerm,
         document.body
     );
 }
+
 
 export default function CurrentTickets() {
     const [tickets, setTickets] = useState([]);
@@ -114,25 +116,40 @@ export default function CurrentTickets() {
         try {
             const formData = new FormData();
             formData.append(field, value);
-            
+
+            console.log(`[DEBUG STEP 1] Sending PATCH for ticket ${ticketId} with ${field}=${value}`);
+
             const response = await fetch(`${API_URL}/api/incidents/${ticketId}/`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${authTokens.access}` },
                 body: formData
             });
+            
+            console.log(`[DEBUG STEP 2] Backend responded with status: ${response.status}`);
 
             if (response.ok) {
-                await fetchData();
+                // This is the updated ticket data straight from the successful PATCH response
+                const updatedTicketFromServer = await response.json();
+                console.log("[DEBUG STEP 3] Received updated ticket from server:", updatedTicketFromServer);
+                console.log("[DEBUG STEP 4] Agent field in response is:", updatedTicketFromServer.agent);
+
+                // Now, update the state and see if it works
+                setTickets(prevTickets =>
+                    prevTickets.map(ticket =>
+                        ticket.id === updatedTicketFromServer.id ? updatedTicketFromServer : ticket
+                    )
+                );
             } else {
-                console.error("Failed to update ticket. Backend responded with an error.");
+                const errorBody = await response.text();
+                console.error("Failed to update ticket. Backend responded with an error.", errorBody);
             }
         } catch (err) {
             console.error('A client-side error occurred while updating the ticket:', err);
         }
     };
     
+    // All other handler functions (handleSelectTicket, etc.) remain the same...
     const handleSelectTicket = (ticketId) => { setSelectedTickets(prev => prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]); };
-
     const handleBulkMove = async (groupName) => {
         setIsMoveMenuOpen(false);
         const updates = selectedTickets.map(id => {
@@ -157,7 +174,6 @@ export default function CurrentTickets() {
         await fetchData();
         setSelectedTickets([]);
     };
-
     const handleExportSelected = () => {
         const ticketsToExport = tickets.filter(t => selectedTickets.includes(t.id));
         if (ticketsToExport.length === 0) return;
@@ -177,14 +193,12 @@ export default function CurrentTickets() {
         document.body.removeChild(link);
         setSelectedTickets([]);
     };
-
     const handleDuplicateSelected = async () => {
         const duplicatePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/duplicate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
         await Promise.all(duplicatePromises);
         await fetchData();
         setSelectedTickets([]);
     };
-
     const handleDeleteSelected = async () => {
         setIsConfirmingDelete(false);
         const deletePromises = selectedTickets.map(id => fetch(`${API_URL}/api/incidents/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }));
@@ -192,7 +206,6 @@ export default function CurrentTickets() {
         await fetchData();
         setSelectedTickets([]);
     };
-
     const handleLabelCreate = async (labelData) => { await fetch(`${API_URL}/api/status-labels/`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
     const handleLabelUpdate = async (labelId, labelData) => { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTokens.access}` }, body: JSON.stringify(labelData) }); fetchData(); };
     const handleLabelDelete = async (labelId) => { if (window.confirm("Are you sure? This will remove the label from all tickets.")) { await fetch(`${API_URL}/api/status-labels/${labelId}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authTokens.access}` } }); fetchData(); } };
